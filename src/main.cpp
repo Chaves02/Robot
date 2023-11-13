@@ -18,7 +18,7 @@
 
 const int numberOfServos = 8; // Number of servos
 const int numberOfACE = 9; // Number of action code elements
-int servoCal[] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // Servo calibration data
+int servoCal[] = { 0, 17, -10, 0, 0, 0, 1, 0 }; // Servo calibration data
 int servoPos[] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // Servo current position
 int servoPrevPrg[] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // Servo previous prg
 int servoPrgPeriod = 20; // 50 ms
@@ -246,105 +246,6 @@ int servoPrg15 [][numberOfACE] PROGMEM = {
   {    0,  45,  45,   0,   0, -45, -45,   0,  300  }, // standby
 };
 
-
-
-void setup() {
-  
-  
-  //getServoCal(); // Get servoCal from EEPROM 
-
-// Servo Pin Set
-  servo[0].attach(0);
-  servo[0].write(90 + servoCal[0]);
-  servo[1].attach(1);
-  servo[1].write(90 + servoCal[1]);
-  servo[2].attach(2);
-  servo[2].write(90 + servoCal[2]);
-  servo[3].attach(3);
-  servo[3].write(90 + servoCal[3]);
-  servo[4].attach(4);
-  servo[4].write(90 + servoCal[4]);
-  servo[5].attach(5);
-  servo[5].write(90 + servoCal[5]);
-  servo[6].attach(6);
-  servo[6].write(90 + servoCal[6]);
-  servo[7].attach(7);
-  servo[7].write(90 + servoCal[7]);
-
-  runServoPrg(servoPrg00, servoPrg00step); // zero position
-
-}
-
-void loop() {
-
-  
-
-  runServoPrgV(servoPrg02, servoPrg02step); //move forward
-  delay(250);
-  runServoPrgV(servoPrg01, servoPrg01step); //stand-by
-  delay(250);
-
-  
-
-/*if (clear) {
-    clearCal(); // Clear Servo calibration data
-  } else if (buttonC01a.getValue()) {
-    calibration(0, 1);
-  } else if (buttonC01b.getValue()) {
-    calibration(0, -1);
-  } else if (buttonC02a.getValue()) {
-    calibration(1, 1);
-  } else if (buttonC02b.getValue()) {
-    calibration(1, -1);
-  } else if (buttonC03a.getValue()) {
-    calibration(2, 1);
-  } else if (buttonC03b.getValue()) {
-    calibration(2, -1);
-  } else if (buttonC04a.getValue()) {
-    calibration(3, 1);
-  } else if (buttonC04b.getValue()) {
-    calibration(3, -1);
-  } else if (buttonC05a.getValue()) {
-    calibration(4, 1);
-  } else if (buttonC05b.getValue()) {
-    calibration(4, -1);
-  } else if (buttonC06a.getValue()) {
-    calibration(5, 1);
-  } else if (buttonC06b.getValue()) {
-    calibration(5, -1);
-  } else if (buttonC07a.getValue()) {
-    calibration(6, 1);
-  } else if (buttonC07b.getValue()) {
-    calibration(6, -1);
-  } else if (buttonC08a.getValue()) {
-    calibration(7, 1);
-  } else if (buttonC08b.getValue()) {
-    calibration(7, -1);
-  }
-
-  // When slider change
-  if (slider01.isValueChanged()) {
-    servo[0].write(slider01.getValue() + servoCal[0]);
-  } else if (slider02.isValueChanged()) {
-    servo[1].write(slider02.getValue() + servoCal[1]);
-  } else if (slider03.isValueChanged()) {
-    servo[2].write(slider03.getValue() + servoCal[2]);
-  } else if (slider04.isValueChanged()) {
-    servo[3].write(slider04.getValue() + servoCal[3]);
-  } else if (slider05.isValueChanged()) {
-    servo[4].write(slider05.getValue() + servoCal[4]);
-  } else if (slider06.isValueChanged()) {
-    servo[5].write(slider06.getValue() + servoCal[5]);
-  } else if (slider07.isValueChanged()) {
-    servo[6].write(slider07.getValue() + servoCal[6]);
-  } else if (slider08.isValueChanged()) {
-    servo[7].write(slider08.getValue() + servoCal[7]);
-  } */ 
-
-}
-
-//-----------------------------------function--------------------------------------------------
-
 void runServoPrg(int servoPrg[][numberOfACE], int step)
 {
   for (int i = 0; i < step; i++) { // Loop for step
@@ -392,6 +293,51 @@ void runServoPrgV(int servoPrg[][numberOfACE], int step) {
     }
   }
 }
+
+void setup() {
+  
+  
+  //getServoCal(); // Get servoCal from EEPROM 
+
+// Servo Pin Set
+  servo[0].attach(0);
+  servo[1].attach(1);
+  servo[2].attach(2);
+  servo[3].attach(3);
+  servo[4].attach(4);
+  servo[5].attach(5);
+  servo[6].attach(6);
+  servo[7].attach(7);
+  
+  servo[0].write(90 + servoCal[0]);
+  servo[1].write(0 + servoCal[1]);
+  servo[2].write(180 + servoCal[2]);
+  servo[3].write(90 + servoCal[3]);
+  servo[4].write(90 + servoCal[4]);
+  servo[5].write(180 + servoCal[5]);
+  servo[6].write(0 + servoCal[6]);
+  servo[7].write(90 + servoCal[7]);
+
+  //runServoPrg(servoPrg00, servoPrg00step); // zero position
+  //servo[0].write(180+servoCal[0]);
+
+}
+
+void loop() {
+
+  
+  //servo[0].write(0);
+  //runServoPrgV(servoPrg02, servoPrg02step); //move forward
+  //delay(250);
+  //runServoPrgV(servoPrg01, servoPrg01step); //stand-by
+  //delay(250);
+
+
+}
+
+//-----------------------------------function--------------------------------------------------
+
+
 
 // Get servoCal from EEPROM
 void getServoCal() {
