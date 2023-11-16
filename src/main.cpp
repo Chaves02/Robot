@@ -1,15 +1,15 @@
 // Spider_mini (Top View)
 //  -----               -----
-// |  4  |             |  0  |
+// |  5  |             |  1  |
 // | GP4 |             | GP0 |
 //  ----- -----   ----- -----
-//       |  5  | |  1  |
+//       |  6  | |  2  |
 //       | GP5 | | GP1 |
 //        -----   -----
-//       |  6  | |  2  |
+//       |  7  | |  3  |
 //       | GP6 | | GP2 |
 //  ----- -----   ----- -----
-// |  7  |             |  3  |
+// |  8  |             |  4  |
 // | GP7 |             | GP3 |
 //  -----               -----
 
@@ -18,7 +18,7 @@
 
 const int numberOfServos = 8; // Number of servos
 const int numberOfACE = 9; // Number of action code elements
-int servoCal[] = { 0, 17, -10, 0, 0, 0, 1, 0 }; // Servo calibration data
+int servoCal[] = { 0, -5, -2, 2, -3, -5, -7, -7 }; // Servo calibration data
 int servoPos[] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // Servo current position
 int servoPrevPrg[] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // Servo previous prg
 int servoPrgPeriod = 20; // 50 ms
@@ -178,7 +178,7 @@ int servoPrg10 [][numberOfACE] PROGMEM = {
 int servoPrg11step = 11;
 int servoPrg11 [][numberOfACE] PROGMEM = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   70,  90,  90, 110, 110,  90,  90,  70,  300  }, // start
+  {   70,  45, 170, 110, 110, 135,  10,  70,  300  }, // start
   {   30,   0,   0, -30, -30,   0,   0,  30,  400  }, // down
   {  -30,   0,   0,  30,  30,   0,   0, -30,  500  }, // up
   {   30,   0,   0, -30, -30,   0,   0,  30,  600  }, // down
@@ -295,11 +295,9 @@ void runServoPrgV(int servoPrg[][numberOfACE], int step) {
 }
 
 void setup() {
-  
-  
-  //getServoCal(); // Get servoCal from EEPROM 
 
-// Servo Pin Set
+  Serial.begin(9600);
+  // Servo Pin Set
   servo[0].attach(0);
   servo[1].attach(1);
   servo[2].attach(2);
@@ -310,28 +308,40 @@ void setup() {
   servo[7].attach(7);
   
   servo[0].write(90 + servoCal[0]);
-  servo[1].write(0 + servoCal[1]);
-  servo[2].write(180 + servoCal[2]);
+  servo[1].write(90 + servoCal[1]);
+  servo[2].write(90 + servoCal[2]);
   servo[3].write(90 + servoCal[3]);
   servo[4].write(90 + servoCal[4]);
-  servo[5].write(180 + servoCal[5]);
-  servo[6].write(0 + servoCal[6]);
+  servo[5].write(90 + servoCal[5]);
+  servo[6].write(90 + servoCal[6]);
   servo[7].write(90 + servoCal[7]);
 
-  //runServoPrg(servoPrg00, servoPrg00step); // zero position
-  //servo[0].write(180+servoCal[0]);
+  runServoPrg(servoPrg00, servoPrg00step); // zero position
+  delay(3000);
 
 }
 
 void loop() {
 
+  runServoPrgV(servoPrg01, servoPrg01step); //stand-by
   
-  //servo[0].write(0);
-  //runServoPrgV(servoPrg02, servoPrg02step); //move forward
-  //delay(250);
-  //runServoPrgV(servoPrg01, servoPrg01step); //stand-by
-  //delay(250);
+  delay(2000);
 
+  //runServoPrgV(servoPrg02, servoPrg02step); //move forward
+  //runServoPrgV(servoPrg03, servoPrg03step); //move backward
+  //runServoPrgV(servoPrg04, servoPrg04step); //move left
+  //runServoPrgV(servoPrg05, servoPrg05step); //move right
+  //runServoPrgV(servoPrg06, servoPrg06step); //turn left
+  //runServoPrgV(servoPrg07, servoPrg07step); //turn right
+  //runServoPrgV(servoPrg08, servoPrg08step); //lie
+  //runServoPrgV(servoPrg09, servoPrg09step); //say hi
+  //runServoPrgV(servoPrg10, servoPrg10step); //fighting
+  runServoPrgV(servoPrg11, servoPrg11step); //push up
+  
+  //runServoPrgV(servoPrg12, servoPrg12step); //sleep
+  //runServoPrgV(servoPrg13, servoPrg13step); //dancing 1
+  //runServoPrgV(servoPrg14, servoPrg14step); //dancing 2
+  //runServoPrgV(servoPrg15, servoPrg15step); //dancing 3
 
 }
 
