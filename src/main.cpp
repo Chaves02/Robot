@@ -18,7 +18,7 @@
 
 const int numberOfServos = 8; // Number of servos
 const int numberOfACE = 9; // Number of action code elements
-int servoCal[] = { 0, -5, -2, 2, -3, -5, -7, -7 }; // Servo calibration data
+int servoCal[] = { -5, -5, -2, 0, 3, -5, -7, -1 }; // Servo calibration data
 int servoPos[] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // Servo current position
 int servoPrevPrg[] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // Servo previous prg
 int servoPrgPeriod = 20; // 50 ms
@@ -27,20 +27,20 @@ Servo servo[numberOfServos]; // Servo object
 // Servo zero position
 int servoAct00 [] PROGMEM =
 // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7
-{  135,  45, 135,  45,  45, 135,  45, 135 };
+{  180,  45, 135,  0,  0, 135,  45, 180 };
 
 // Zero
 int servoPrg00step = 1;
 int servoPrg00 [][numberOfACE] PROGMEM = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {  135,  45, 135,  45,  45, 135,  45, 135, 1000  }, // zero position
+  {  180,  45, 135,  0,  0, 135,  45, 180, 1000  }, // zero position          /////////check///////////
 };
 
 // Standby
 int servoPrg01step = 2;
 int servoPrg01 [][numberOfACE] PROGMEM = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   90,  90,  90,  90,  90,  90,  90,  90,  200  }, // prep standby
+  {   90,  90,  90,  90,  90,  90,  90,  90,  200  }, // prep standby       /////////check///////////
   {  -20,   0,   0,  20,  20,   0,   0, -20,  200  }, // standby
 };
 
@@ -48,7 +48,7 @@ int servoPrg01 [][numberOfACE] PROGMEM = {
 int servoPrg02step = 11;
 int servoPrg02 [][numberOfACE] PROGMEM = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   70,  90,  90, 110, 110,  90,  90,  70,  100  }, // standby
+  {  135,  90,  90,  45,  45,  90,  90, 135,  100  }, // standby      +-65         ////////check//////
   {   20,   0,   0,   0,   0,   0, -45,  20,  100  }, // leg1,4 up; leg4 fw
   {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg1,4 dn
   {    0,   0,   0, -20, -20,   0,   0,   0,  100  }, // leg2,3 up
@@ -65,7 +65,7 @@ int servoPrg02 [][numberOfACE] PROGMEM = {
 int servoPrg03step = 11;
 int servoPrg03 [][numberOfACE] PROGMEM = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   70,  90,  90, 110, 110,  90,  90,  70,  100  }, // standby
+  {  135,  90,  90,  45,  45,  90,  90, 135,  100  }, // standby     +-65            ////////check////////
   {   20, -45,   0,   0,   0,   0,   0,  20,  100  }, // leg4,1 up; leg1 fw
   {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg4,1 dn
   {    0,   0,   0, -20, -20,   0,   0,   0,  100  }, // leg3,2 up
@@ -82,7 +82,7 @@ int servoPrg03 [][numberOfACE] PROGMEM = {
 int servoPrg04step = 11;
 int servoPrg04 [][numberOfACE] PROGMEM = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   70,  90,  90, 110, 110,  90,  90,  70,  100  }, // standby
+  {  135,  90,  90,  45,  45,  90,  90, 135,  100  }, // standby                  ////////check////////
   {    0,   0, -45, -20, -20,   0,   0,   0,  100  }, // leg3,2 up; leg2 fw
   {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg3,2 dn
   {   20,   0,   0,   0,   0,   0,   0,  20,  100  }, // leg1,4 up
@@ -99,7 +99,7 @@ int servoPrg04 [][numberOfACE] PROGMEM = {
 int servoPrg05step = 11;
 int servoPrg05 [][numberOfACE] PROGMEM = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   70,  90,  90, 110, 110,  90,  90,  70,  100  }, // standby
+  {  135,  90,  90,  45,  45,  90,  90, 135,  100  }, // standby                ////////check////////
   {    0,   0,   0, -20, -20, -45,   0,   0,  100  }, // leg2,3 up; leg3 fw
   {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg2,3 dn
   {   20,   0,   0,   0,   0,   0,   0,  20,  100  }, // leg4,1 up
@@ -116,7 +116,7 @@ int servoPrg05 [][numberOfACE] PROGMEM = {
 int servoPrg06step = 8;
 int servoPrg06 [][numberOfACE] PROGMEM = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   70,  90,  90, 110, 110,  90,  90,  70,  100  }, // standby
+  {  135,  90,  90,  45,  45,  90,  90, 135,  100  }, // standby           ////////check////////
   {   20,   0,   0,   0,   0,   0,   0,  20,  100  }, // leg1,4 up
   {    0,  45,   0,   0,   0,   0,  45,   0,  100  }, // leg1,4 turn
   {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg1,4 dn
@@ -130,7 +130,7 @@ int servoPrg06 [][numberOfACE] PROGMEM = {
 int servoPrg07step = 8;
 int servoPrg07 [][numberOfACE] PROGMEM = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   70,  90,  90, 110, 110,  90,  90,  70,  100  }, // standby
+  {  135,  90,  90,  45,  45,  90,  90, 135,  100  }, // standby           ////////check////////
   {    0,   0,   0, -20, -20,   0,   0,   0,  100  }, // leg2,3 up
   {    0,   0, -45,   0,   0, -45,   0,   0,  100  }, // leg2,3 turn
   {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg2,3 dn
@@ -325,7 +325,7 @@ void loop() {
 
   runServoPrgV(servoPrg01, servoPrg01step); //stand-by
   
-  delay(2000);
+  //delay(2000);
 
   //runServoPrgV(servoPrg02, servoPrg02step); //move forward
   //runServoPrgV(servoPrg03, servoPrg03step); //move backward
@@ -336,7 +336,7 @@ void loop() {
   //runServoPrgV(servoPrg08, servoPrg08step); //lie
   //runServoPrgV(servoPrg09, servoPrg09step); //say hi
   //runServoPrgV(servoPrg10, servoPrg10step); //fighting
-  runServoPrgV(servoPrg11, servoPrg11step); //push up
+  //runServoPrgV(servoPrg11, servoPrg11step); //push up
   
   //runServoPrgV(servoPrg12, servoPrg12step); //sleep
   //runServoPrgV(servoPrg13, servoPrg13step); //dancing 1
