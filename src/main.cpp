@@ -1,16 +1,16 @@
 // Spider_mini (Top View)
 //  -----               -----
-// |  5  |             |  1  |
-// | GP4 |             | GP0 |
+// |  1  |             |  3  |
+// | GP0 |             | GP4 |
 //  ----- -----   ----- -----
-//       |  6  | |  2  |
-//       | GP5 | | GP1 |
+//       |     | |     |
+//       | GP1 | | GP5 |
 //        -----   -----
-//       |  7  | |  3  |
-//       | GP6 | | GP2 |
+//       |     | |     |
+//       | GP2 | | GP6 |
 //  ----- -----   ----- -----
-// |  8  |             |  4  |
-// | GP7 |             | GP3 |
+// |  2  |             |  4  |
+// | GP3 |             | GP7 |
 //  -----               -----
 
 #include <Arduino.h>
@@ -141,17 +141,22 @@ int servoPrg07 [][numberOfACE] PROGMEM = {
 };
 
 // Lie
-int servoPrg08step = 1;
+int servoPrg08step = 6;
 int servoPrg08 [][numberOfACE] PROGMEM = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {  110,  90,  90,  70,  70,  90,  90, 110,  500  }, // leg1,4 up
+  {  135,  45, 135,  45,  45, 135,  45,  135, 100 },                      //////check/////////
+  {    0,   0,   0,  15, 135,   0,   0,  -15, 200 },
+  {    0,   0,   0,   0,   0,  45,   0,    0, 350 },
+  {    0,   0,   0,   0,   0, -45,   0,    0, 350 },
+  {    0,   0,   0,   0,   0,  45,   0,    0, 350 },
+  {    0,   0,   0,   0,   0, -45,   0,    0, 350 } 
 };
 
 // Say Hi
 int servoPrg09step = 4;
 int servoPrg09 [][numberOfACE] PROGMEM = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {  120,  90,  90, 110,  60,  90,  90,  70,  200  }, // leg1, 3 down
+  {  140,  90,  90,  80,  40,  90,  90, 100,  200  }, // leg1, 3 down
   {  -50,   0,   0,   0,  50,   0,   0,   0,  200  }, // standby
   {   50,   0,   0,   0, -50,   0,   0,   0,  200  }, // leg1, 3 down
   {  -50,   0,   0,   0,  50,   0,   0,   0,  200  }, // standby
@@ -178,17 +183,17 @@ int servoPrg10 [][numberOfACE] PROGMEM = {
 int servoPrg11step = 11;
 int servoPrg11 [][numberOfACE] PROGMEM = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   70,  45, 170, 110, 110, 135,  10,  70,  300  }, // start
-  {   30,   0,   0, -30, -30,   0,   0,  30,  400  }, // down
-  {  -30,   0,   0,  30,  30,   0,   0, -30,  500  }, // up
-  {   30,   0,   0, -30, -30,   0,   0,  30,  600  }, // down
-  {  -30,   0,   0,  30,  30,   0,   0, -30,  700  }, // up
-  {   30,   0,   0, -30, -30,   0,   0,  30,  1300 }, // down
-  {  -30,   0,   0,  30,  30,   0,   0, -30,  1800 }, // up
-  {   65,   0,   0, -65, -65,   0,   0,  65,  200  }, // fast down
-  {  -65,   0,   0,   0,  15,   0,   0,   0,  500  }, // leg1 up
-  {    0,   0,   0,   0,  50,   0,   0,   0,  500  }, // leg2 up
-  {    0,   0,   0,  65,   0,   0,   0, -65,  500  }, // leg3, leg4 up
+  {  135,  90, 170,  45,  45,  90,  10, 135,  300  }, // start                  /////check//////
+  {  -30,   0,   0,  45,  30,   0,   0,   0,  400  }, // down
+  {   30,   0,   0, -45, -30,   0,   0,   0,  500  }, // up
+  {  -30,   0,   0,   0,  30,   0,   0, -45,  600  }, // down
+  {   30,   0,   0,   0, -30,   0,   0,  45,  700  }, // up
+  {  -30,   0,   0,  45,  30,   0,   0,   0,  1300 }, // down
+  {   30,   0,   0, -45, -30,   0,   0,   0,  1800 }, // up
+  {  -45,   0,   0,  30,  45,   0,   0, -30,  200  }, // fast down
+  {   45,   0,   0,   0, -10,   0,   0,   0,  500  }, // leg1 up
+  {    0,   0,   0,   0, -35,   0,   0,   0,  500  }, // leg2 up
+  {    0,   0,   0, -30,   0,   0,   0,  30,  500  }, // leg3, leg4 up
 };
 
 // Sleep
@@ -323,20 +328,20 @@ void setup() {
 
 void loop() {
 
-  runServoPrgV(servoPrg01, servoPrg01step); //stand-by
-  
-  //delay(2000);
+  //runServoPrgV(servoPrg01, servoPrg01step); //stand-by
 
   //runServoPrgV(servoPrg02, servoPrg02step); //move forward
+  
+  //delay(1000);
   //runServoPrgV(servoPrg03, servoPrg03step); //move backward
   //runServoPrgV(servoPrg04, servoPrg04step); //move left
   //runServoPrgV(servoPrg05, servoPrg05step); //move right
   //runServoPrgV(servoPrg06, servoPrg06step); //turn left
   //runServoPrgV(servoPrg07, servoPrg07step); //turn right
-  //runServoPrgV(servoPrg08, servoPrg08step); //lie
+  runServoPrgV(servoPrg08, servoPrg08step); //lie
   //runServoPrgV(servoPrg09, servoPrg09step); //say hi
   //runServoPrgV(servoPrg10, servoPrg10step); //fighting
-  //runServoPrgV(servoPrg11, servoPrg11step); //push up
+  runServoPrgV(servoPrg11, servoPrg11step); //push up
   
   //runServoPrgV(servoPrg12, servoPrg12step); //sleep
   //runServoPrgV(servoPrg13, servoPrg13step); //dancing 1
