@@ -27,7 +27,7 @@ Servo servo[numberOfServos]; // Servo object
 // Servo zero position
 int servoAct00 []  =
 // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7
-{  180,  45, 135,  0,  0, 135,  45, 180 };
+{   0 , 135,  45, 180, 180,  45, 135,  0 };
 
 
 // Zero
