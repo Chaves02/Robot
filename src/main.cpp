@@ -18,7 +18,7 @@
 
 const int numberOfServos = 8; // Number of servos
 const int numberOfACE = 9; // Number of action code elements
-int servoCal[] = { -2, 9, -7, -7, -5, 5, -7, 5 }; // Servo calibration data
+int servoCal[] = { -2, -4, 2, -7, -5, 0, 0, 5 }; // Servo calibration data
 int servoPos[] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // Servo current position
 int servoPrevPrg[] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // Servo previous prg
 int servoPrgPeriod = 20; // 50 ms
@@ -27,14 +27,14 @@ Servo servo[numberOfServos]; // Servo object
 // Servo zero position
 int servoAct00 []  =
 // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7
-{   0 , 135,  45, 180, 180,  45, 135,  0 };
+{   0 ,  45, 135, 180, 180, 135,  45,  0 };
 
 
 // Zero
 int servoPrg00step = 1;
 int servoPrg00 [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {    0, 135,  45, 180, 180,  45, 135,   0, 1000  }, // zero position          /////////check///////////
+  {    0,  45, 135, 180, 180, 135,  45,  0, 1000  }, // zero position          /////////check///////////
 };
 
 
@@ -50,7 +50,7 @@ int servoPrg01 [][numberOfACE]  = {
 int servoPrg02step = 11;
 int servoPrg02 [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30, 135,  45, 150, 150,  45, 135,  30,  100  }, // standby      +-65         ////////check//////
+  {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby               ////////check//////
   {   20,   0,   0,   0,   0,   0, -45,  20,  100  }, // leg1,4 up; leg4 fw
   {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg1,4 dn
   {    0,   0,   0, -20, -20,   0,   0,   0,  100  }, // leg2,3 up
@@ -67,7 +67,7 @@ int servoPrg02 [][numberOfACE]  = {
 int servoPrg03step = 11;
 int servoPrg03 [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30, 135,  45, 150, 150,  45, 135,  30,  100  }, // standby     +-65            ////////check////////
+  {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby                ////////check////////
   {   20, -45,   0,   0,   0,   0,   0,  20,  100  }, // leg4,1 up; leg1 fw
   {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg4,1 dn
   {    0,   0,   0, -20, -20,   0,   0,   0,  100  }, // leg3,2 up
@@ -84,7 +84,7 @@ int servoPrg03 [][numberOfACE]  = {
 int servoPrg04step = 11;
 int servoPrg04 [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30, 135,  45, 150, 150,  45, 135,  30,  100  }, // standby                  ////////check////////
+  {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby                  ////////check////////
   {    0,   0, -45, -20, -20,   0,   0,   0,  100  }, // leg3,2 up; leg2 fw
   {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg3,2 dn
   {   20,   0,   0,   0,   0,   0,   0,  20,  100  }, // leg1,4 up
@@ -101,7 +101,7 @@ int servoPrg04 [][numberOfACE]  = {
 int servoPrg05step = 11;
 int servoPrg05 [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30, 135,  45, 150, 150,  45, 135,  30,  100  }, // standby                ////////check////////
+  {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby                ////////check////////
   {    0,   0,   0, -20, -20, -45,   0,   0,  100  }, // leg2,3 up; leg3 fw
   {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg2,3 dn
   {   20,   0,   0,   0,   0,   0,   0,  20,  100  }, // leg4,1 up
@@ -118,7 +118,7 @@ int servoPrg05 [][numberOfACE]  = {
 int servoPrg06step = 8;
 int servoPrg06 [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30, 135,  45, 150, 150,  45, 135,  30,  100  }, // standby           ////////check////////
+  {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby           ////////check////////
   {   20,   0,   0,   0,   0,   0,   0,  20,  100  }, // leg1,4 up
   {    0,  45,   0,   0,   0,   0,  45,   0,  100  }, // leg1,4 turn
   {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg1,4 dn
@@ -132,7 +132,7 @@ int servoPrg06 [][numberOfACE]  = {
 int servoPrg07step = 8;
 int servoPrg07 [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30, 135,  45, 150, 150,  45, 135,  30,  100  }, // standby           ////////check////////
+  {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby           ////////check////////
   {    0,   0,   0, -20, -20,   0,   0,   0,  100  }, // leg2,3 up
   {    0,   0, -45,   0,   0, -45,   0,   0,  100  }, // leg2,3 turn
   {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg2,3 dn
@@ -146,7 +146,7 @@ int servoPrg07 [][numberOfACE]  = {
 int servoPrg08step = 6;
 int servoPrg08 [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30, 135,  45, 150, 150,  45, 135,  30, 100 }, //standby                   ///////check/////////
+  {   30,  90,  90, 150, 150,  80,  90,  30, 100 }, //standby                   ///////check/////////
   {  150,   0,   0, -20,   0,   0,   0,  20, 200 }, //leg1 maxup and leg2,4 up
   {    0,  45,   0,   0,   0,   0,   0,   0, 350 }, //leg1 fw
   {    0, -45,   0,   0,   0,   0,   0,   0, 350 }, //leg1 bk
@@ -185,17 +185,17 @@ int servoPrg10 [][numberOfACE]  = {
 int servoPrg11step = 11;
 int servoPrg11 [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms                           /////check/////
-  {   30,  90,  10, 150, 150,  90, 170,  30,  300  }, // start position           
-  {  -30,   0,   0,  45,  30,   0,   0,   0,  400  }, // down
-  {   30,   0,   0, -45, -30,   0,   0,   0,  500  }, // up
-  {  -30,   0,   0,   0,  30,   0,   0, -45,  600  }, // down
-  {   30,   0,   0,   0, -30,   0,   0,  45,  700  }, // up
-  {  -30,   0,   0,  45,  30,   0,   0,   0,  1300 }, // down
-  {   30,   0,   0, -45, -30,   0,   0,   0,  1800 }, // up
-  {  -45,   0,   0,  30,  45,   0,   0, -30,  200  }, // fast down
-  {   45,   0,   0,   0, -10,   0,   0,   0,  500  }, // leg1 up
-  {    0,   0,   0,   0, -35,   0,   0,   0,  500  }, // leg2 up
-  {    0,   0,   0, -30,   0,   0,   0,  30,  500  }, // leg3, leg4 up
+  {   30,  45,  45, 150, 150, 135, 135,  30,  300  }, // start position           
+  {   30,   0,   0, -40, -30,   0,   0,   0,  400  }, // down
+  {  -30,   0,   0,  40,  30,   0,   0,   0,  500  }, // up
+  {   30,   0,   0,   0, -30,   0,   0,  40,  600  }, // down
+  {  -30,   0,   0,   0,  30,   0,   0, -40,  700  }, // up
+  {   30,   0,   0, -40, -30,   0,   0,   0,  1300 }, // down
+  {  -30,   0,   0,  40,  30,   0,   0,   0,  1800 }, // up
+  {   45,   0,   0, -30, -45,   0,   0,  30,  200  }, // fast down
+  {  -45,   0,   0,   0,  10,   0,   0,   0,  500  }, // leg1 up
+  {    0,   0,   0,   0,  35,   0,   0,   0,  500  }, // leg2 up
+  {    0,   0,   0,  30,   0,   0,   0, -30,  500  }, // leg3, leg4 up
 };
 
 // Sleep
@@ -209,32 +209,32 @@ int servoPrg12 [][numberOfACE]  = {
 // Dancing 1
 int servoPrg13step = 10;
 int servoPrg13 [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {  150,  90,  90,  30,  30,  90,  90, 150,  300  }, // leg1,2,3,4 up
-  {  -40,   0,   0,   0,   0,   0,   0,   0,  300  }, // leg1 dn
-  {   40,   0,   0,  40,   0,   0,   0,   0,  300  }, // leg1 up; leg2 dn
-  {    0,   0,   0, -40,   0,   0,   0, -40,  300  }, // leg2 up; leg4 dn
-  {    0,   0,   0,   0,  40,   0,   0,  40,  300  }, // leg4 up; leg3 dn
-  {  -40,   0,   0,   0, -40,   0,   0,   0,  300  }, // leg3 up; leg1 dn
-  {   40,   0,   0,  40,   0,   0,   0,   0,  300  }, // leg1 up; leg2 dn
-  {    0,   0,   0, -40,   0,   0,   0, -40,  300  }, // leg2 up; leg4 dn
-  {    0,   0,   0,   0,  40,   0,   0,  40,  300  }, // leg4 up; leg3 dn
-  {    0,   0,   0,   0, -40,   0,   0,   0,  300  }, // leg3 up
+  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms                         ////check/////
+  {   30,  90,  90, 150, 150,  90,  90,  30,  300  }, // leg1,2,3,4 up
+  {  -30,   0,   0,   0,   0,   0,   0,   0,  300  }, // leg1 dn
+  {   30,   0,   0,  30,   0,   0,   0,   0,  300  }, // leg1 up; leg2 dn
+  {    0,   0,   0, -30,   0,   0,   0, -30,  300  }, // leg2 up; leg4 dn
+  {    0,   0,   0,   0,  30,   0,   0,  30,  300  }, // leg4 up; leg3 dn
+  {  -30,   0,   0,   0, -30,   0,   0,   0,  300  }, // leg3 up; leg1 dn
+  {   30,   0,   0,  30,   0,   0,   0,   0,  300  }, // leg1 up; leg2 dn
+  {    0,   0,   0, -30,   0,   0,   0, -30,  300  }, // leg2 up; leg4 dn
+  {    0,   0,   0,   0,  30,   0,   0,  30,  300  }, // leg4 up; leg3 dn
+  {    0,   0,   0,   0, -30,   0,   0,   0,  300  }, // leg3 up
 };
 
 // Dancing 2
 int servoPrg14step = 9;
 int servoPrg14 [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {  150,  90,  90,  30,  30,  90,  90, 150,  300  }, // leg1,2,3,4 two sides
-  {   45,   0,   0, -45,   0,   0,   0,   0,  300  }, // leg1,2 up
-  {  -45,   0,   0,  45, -45,   0,   0,  45,  300  }, // leg1,2 dn; leg3,4 up
-  {   45,   0,   0, -45,  45,   0,   0, -45,  300  }, // leg3,4 dn; leg1,2 up
-  {  -45,   0,   0,  45, -45,   0,   0,  45,  300  }, // leg1,2 dn; leg3,4 up
-  {   45,   0,   0, -45,  45,   0,   0, -45,  300  }, // leg3,4 dn; leg1,2 up
-  {  -45,   0,   0,  45, -45,   0,   0,  45,  300  }, // leg1,2 dn; leg3,4 up
-  {   45,   0,   0, -45,  45,   0,   0, -45,  300  }, // leg3,4 dn; leg1,2 up
-  {  -40,   0,   0,  40,   0,   0,   0,   0,  300  }, // leg1,2 dn
+  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms                                 ////check/////
+  {   30,  45, 135, 150, 150, 135,  45,  30,  300  }, // leg1,2,3,4 two sides
+  {   30,   0,   0, -30,   0,   0,   0,   0,  300  }, // leg1,2 up
+  {  -30,   0,   0,  30, -30,   0,   0,  30,  300  }, // leg1,2 dn; leg3,4 up
+  {   30,   0,   0, -30,  30,   0,   0, -30,  300  }, // leg3,4 dn; leg1,2 up
+  {  -30,   0,   0,  30, -30,   0,   0,  30,  300  }, // leg1,2 dn; leg3,4 up
+  {   30,   0,   0, -30,  30,   0,   0, -30,  300  }, // leg3,4 dn; leg1,2 up
+  {  -30,   0,   0,  30, -30,   0,   0,  30,  300  }, // leg1,2 dn; leg3,4 up
+  {   30,   0,   0, -30,  30,   0,   0, -30,  300  }, // leg3,4 dn; leg1,2 up
+  {  -25,   0,   0,  25,   0,   0,   0,   0,  300  }, // leg1,2 dn
 };
 
 // Dancing 3
@@ -377,53 +377,19 @@ void loop() {
     runServoPrgV(servoPrg12, servoPrg12step); //sleep
   }
   
-  //runServoPrgV(servoPrg13, servoPrg13step); //dancing 1
-  //runServoPrgV(servoPrg14, servoPrg14step); //dancing 2
+  for(int i=0; i<5; i++){
+    runServoPrgV(servoPrg13, servoPrg13step); //dancing 1
+  }
+
+  for(int i=0; i<5; i++){
+    runServoPrgV(servoPrg14, servoPrg14step); //dancing 2
+  }
 
   for(int i=0; i<5; i++){
     runServoPrgV(servoPrg15, servoPrg15step); //dancing 3
   }
   
-  for(int i=0; i<20; i++){
+  for(int i=0; i<15; i++){
     runServoPrgV(servoPrg01, servoPrg01step); //stand-by
   }
-}
-
-//-----------------------------------function--------------------------------------------------
-
-
-
-// Get servoCal from EEPROM
-void getServoCal() {
-  int eeAddress = 0;
-  for (int i = 0; i < numberOfServos; i++) {
-    //EEPROM.get(eeAddress, servoCal[i]);
-    eeAddress += sizeof(servoCal[i]);
-  }
-}
-
-// Put servoCal to EEPROM
-void putServoCal() {
-  int eeAddress = 0;
-  for (int i = 0; i < numberOfServos; i++) {
-    //EEPROM.put(eeAddress, servoCal[i]);
-    eeAddress += sizeof(servoCal[i]);
-  }
-}
-
-// Clear Servo calibration data
-void clearCal() {
-  for (int i = 0; i < numberOfServos; i++) {
-    servoCal[i] = 0;
-  }
-  putServoCal(); // Put servoCal to EEPROM
-  runServoPrg(servoPrg00, servoPrg00step); // zero position
-}
-
-// Calibration
-void calibration(int i, int change) {
-  servoCal[i] = servoCal[i] + change;
-  servo[i].write(servoAct00[i] + servoCal[i]);
-  putServoCal(); // Put servoCal to EEPROM
-  delay(400);
 }
