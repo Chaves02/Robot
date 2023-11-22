@@ -185,7 +185,7 @@ int servoPrg10 [][numberOfACE]  = {
 int servoPrg11step = 11;
 int servoPrg11 [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms                           /////check/////
-  {   30,  45,  45, 150, 150, 135, 135,  30,  300  }, // start position           
+  {   30,  45,  38, 150, 150, 135, 147,  30,  300  }, // start position           
   {   30,   0,   0, -40, -30,   0,   0,   0,  400  }, // down
   {  -30,   0,   0,  40,  30,   0,   0,   0,  500  }, // up
   {   30,   0,   0,   0, -30,   0,   0,  40,  600  }, // down
@@ -241,7 +241,7 @@ int servoPrg14 [][numberOfACE]  = {
 int servoPrg15step = 10;
 int servoPrg15 [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms                           ////check////
-  {   30,  45,  45, 150, 150, 135, 135,  30,  300  }, // leg1,2,3,4 bk
+  {   30,  45,  38, 150, 150, 135, 147,  30,  300  }, // leg1,2,3,4 bk
   {   30,   0,   0, -40, -30,   0,   0,   0,  300  }, // leg1,2,3 up
   {  -30,   0,   0,  40,  30,   0,   0,   0,  300  }, // leg1,2,3 dn
   {   30,   0,   0,   0, -30,   0,   0,  40,  300  }, // leg1,3,4 up
@@ -376,16 +376,14 @@ void loop() {
   for(int i=0; i<5; i++){
     runServoPrgV(servoPrg12, servoPrg12step); //sleep
   }
-  
+
   for(int i=0; i<5; i++){
     runServoPrgV(servoPrg13, servoPrg13step); //dancing 1
   }
-
   for(int i=0; i<5; i++){
     runServoPrgV(servoPrg14, servoPrg14step); //dancing 2
   }
-
-  for(int i=0; i<5; i++){
+   for(int i=0; i<5; i++){
     runServoPrgV(servoPrg15, servoPrg15step); //dancing 3
   }
   
