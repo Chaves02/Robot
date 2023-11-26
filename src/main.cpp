@@ -15,6 +15,12 @@
 
 #include <Arduino.h>
 #include <Servo.h>
+#include <NewPing.h>
+
+// Define HC-SR04 sensor pins
+#define TRIGGER_PIN  16  // Arduino pin for trigger
+#define ECHO_PIN     17  // Arduino pin for echo
+#define MAX_DISTANCE 30 // Maximum distance in centimeters
 
 const int numberOfServos = 8; // Number of servos
 const int numberOfACE = 9; // Number of action code elements
@@ -331,63 +337,112 @@ void setup() {
 
 }
 
+int flag = 0; // Flag for checking if an object is detected
+
+unsigned long previousMillis = 0;
+const long interval = 1000;  // Interval for checking the sensor (in milliseconds)
+
+// Create an instance of the NewPing library
+NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
+
+
 void loop() {
 
-  for(int i=0; i<5; i++){
+
+  // Get the current time
+  unsigned long currentMillis = millis();
+
+  // Check if the specified interval has passed
+  if (currentMillis - previousMillis >= interval) {
+    // Save the current time
+    previousMillis = currentMillis;
+
+    // Perform the sensor reading
+    int distance = sonar.ping_cm();
+
+    // Check if an object is detected within the specified range
+    if (distance > 0 && distance < MAX_DISTANCE) {
+      // Object detected, set the flag to 1
+      flag = 1;
+    } else {
+      // No object detected, set the flag to 0
+      flag = 0;
+    }
+
+    // Print the distance and flag status
+    Serial.print("Distance: ");
+    Serial.print(distance);
+    Serial.print(" cm, Flag: ");
+    Serial.println(flag);
+  }
+
+  if (flag == 0)
     runServoPrgV(servoPrg02, servoPrg02step); //move forward
-  }
-
-  for(int i=0; i<5; i++){
+  if (flag == 1){
     runServoPrgV(servoPrg03, servoPrg03step); //move backward
+    for(int i=0; i<3; i++){
+      runServoPrgV(servoPrg07, servoPrg07step); //turn right
+    }
   }
+    
+    
+  //for(int i=0; i<5; i++){
+  //  runServoPrgV(servoPrg02, servoPrg02step); //move forward
+  //}
+//
+  //for(int i=0; i<5; i++){
+  //  runServoPrgV(servoPrg03, servoPrg03step); //move backward
+  //}
+//
+  //for(int i=0; i<5; i++){
+  //  runServoPrgV(servoPrg04, servoPrg04step); //move left
+  //}
+//
+  //for(int i=0; i<5; i++){
+  //  runServoPrgV(servoPrg05, servoPrg05step); //move right
+  //}
+//
+  //for(int i=0; i<5; i++){
+  //  runServoPrgV(servoPrg06, servoPrg06step); //turn left
+  //}
+  //
+  //for(int i=0; i<5; i++){
+  //  runServoPrgV(servoPrg07, servoPrg07step); //turn right
+  //}
+//
+  //for(int i=0; i<5; i++){
+  //  runServoPrgV(servoPrg08, servoPrg08step); //lie
+  //}
+//
+  //for(int i=0; i<5; i++){
+  //  runServoPrgV(servoPrg09, servoPrg09step); //say hi
+  //}
+//
+  //for(int i=0; i<5; i++){
+  //  runServoPrgV(servoPrg10, servoPrg10step); //fighting
+  //}
+//
+  //for(int i=0; i<5; i++){
+  //  runServoPrgV(servoPrg11, servoPrg11step); //push up
+  //}
+//
+  //for(int i=0; i<5; i++){
+  //  runServoPrgV(servoPrg12, servoPrg12step); //sleep
+  //}
+//
+  //for(int i=0; i<5; i++){
+  //  runServoPrgV(servoPrg13, servoPrg13step); //dancing 1
+  //}
+  //for(int i=0; i<5; i++){
+  //  runServoPrgV(servoPrg14, servoPrg14step); //dancing 2
+  //}
+  // for(int i=0; i<5; i++){
+  //  runServoPrgV(servoPrg15, servoPrg15step); //dancing 3
+  //}
+  //
+  //for(int i=0; i<15; i++){
+  //  runServoPrgV(servoPrg01, servoPrg01step); //stand-by
+  //}
 
-  for(int i=0; i<5; i++){
-    runServoPrgV(servoPrg04, servoPrg04step); //move left
-  }
-
-  for(int i=0; i<5; i++){
-    runServoPrgV(servoPrg05, servoPrg05step); //move right
-  }
-
-  for(int i=0; i<5; i++){
-    runServoPrgV(servoPrg06, servoPrg06step); //turn left
-  }
   
-  for(int i=0; i<5; i++){
-    runServoPrgV(servoPrg07, servoPrg07step); //turn right
-  }
-
-  for(int i=0; i<5; i++){
-    runServoPrgV(servoPrg08, servoPrg08step); //lie
-  }
-
-  for(int i=0; i<5; i++){
-    runServoPrgV(servoPrg09, servoPrg09step); //say hi
-  }
-
-  for(int i=0; i<5; i++){
-    runServoPrgV(servoPrg10, servoPrg10step); //fighting
-  }
-
-  for(int i=0; i<5; i++){
-    runServoPrgV(servoPrg11, servoPrg11step); //push up
-  }
-
-  for(int i=0; i<5; i++){
-    runServoPrgV(servoPrg12, servoPrg12step); //sleep
-  }
-
-  for(int i=0; i<5; i++){
-    runServoPrgV(servoPrg13, servoPrg13step); //dancing 1
-  }
-  for(int i=0; i<5; i++){
-    runServoPrgV(servoPrg14, servoPrg14step); //dancing 2
-  }
-   for(int i=0; i<5; i++){
-    runServoPrgV(servoPrg15, servoPrg15step); //dancing 3
-  }
-  
-  for(int i=0; i<15; i++){
-    runServoPrgV(servoPrg01, servoPrg01step); //stand-by
-  }
 }
