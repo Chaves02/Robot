@@ -16,11 +16,19 @@
 #include <Arduino.h>
 #include <Servo.h>
 #include <NewPing.h>
+#include <elapsedMillis.h>
 
 // Define HC-SR04 sensor pins
-#define TRIGGER_PIN  16  // Arduino pin for trigger
-#define ECHO_PIN     17  // Arduino pin for echo
+#define TRIGGER_PIN  17  // Arduino pin for trigger
+#define ECHO_PIN     16  // Arduino pin for echo
 #define MAX_DISTANCE 30 // Maximum distance in centimeters
+
+// Create an instance of the NewPing library
+NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
+
+elapsedMillis timeElapsed; 
+int flag = 0; // Flag for checking if an object is detected
+const long interval = 500;  // Interval for checking the sensor (in milliseconds)
 
 const int numberOfServos = 8; // Number of servos
 const int numberOfACE = 9; // Number of action code elements
@@ -30,17 +38,11 @@ int servoPrevPrg[] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // Servo previous prg
 int servoPrgPeriod = 20; // 50 ms
 Servo servo[numberOfServos]; // Servo object
 
-// Servo zero position
-int servoAct00 []  =
-// GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7
-{   0 ,  45, 135, 180, 180, 135,  45,  0 };
-
-
 // Zero
 int servoPrg00step = 1;
 int servoPrg00 [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {    0,  45, 135, 180, 180, 135,  45,  0, 1000  }, // zero position          /////////check///////////
+  {  0,  45, 135, 180, 180, 135,  45,  0, 1000  }, // zero position          /////////check///////////
 };
 
 
@@ -60,10 +62,10 @@ int servoPrg02 [][numberOfACE]  = {
   {   20,   0,   0,   0,   0,   0, -45,  20,  100  }, // leg1,4 up; leg4 fw
   {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg1,4 dn
   {    0,   0,   0, -20, -20,   0,   0,   0,  100  }, // leg2,3 up
-  {    0, -60,  60,   0,   0,   0,  45,   0,  100  }, // leg1,4 bk; leg2 fw
+  {    0, -57,  57,   0,   0,   0,  45,   0,  100  }, // leg1,4 bk; leg2 fw
   {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg2,3 dn
-  {   20,  60,   0,   0,   0,   0,   0,  20,  100  }, // leg1,4 up; leg1 fw
-  {    0,   0, -60,   0,   0,  45,   0,   0,  100  }, // leg2,3 bk
+  {   20,  57,   0,   0,   0,   0,   0,  20,  100  }, // leg1,4 up; leg1 fw
+  {    0,   0, -57,   0,   0,  45,   0,   0,  100  }, // leg2,3 bk
   {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg1,4 dn
   {    0,   0,   0,   0, -20,   0,   0,   0,  100  }, // leg3 up
   {    0,   0,   0,   0,  20, -45,   0,   0,  100  }, // leg3 fw dn
@@ -307,6 +309,31 @@ void runServoPrgV(int servoPrg[][numberOfACE], int step) {
   }
 }
 
+void sensor() {
+  if (timeElapsed >= interval) {
+    timeElapsed = 0; 
+
+    // Perform the sensor reading
+    int distance = sonar.ping_cm();
+
+    // Check if an object is detected within the specified range
+    if (distance > 0 && distance < MAX_DISTANCE) {
+      // Object detected, set the flag to 1
+      flag = 1;
+    } else {
+      // No object detected, set the flag to 0
+      flag = 0;
+    }
+
+    // Print the distance and flag status
+    Serial.print("Distance: ");
+    Serial.print(distance);
+    Serial.print(" cm, Flag: ");
+    Serial.println(flag);
+
+  }
+}
+
 void setup() {
 
   Serial.begin(9600);
@@ -337,51 +364,17 @@ void setup() {
 
 }
 
-int flag = 0; // Flag for checking if an object is detected
-
-unsigned long previousMillis = 0;
-const long interval = 1000;  // Interval for checking the sensor (in milliseconds)
-
-// Create an instance of the NewPing library
-NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
-
-
 void loop() {
 
-
-  // Get the current time
-  unsigned long currentMillis = millis();
-
-  // Check if the specified interval has passed
-  if (currentMillis - previousMillis >= interval) {
-    // Save the current time
-    previousMillis = currentMillis;
-
-    // Perform the sensor reading
-    int distance = sonar.ping_cm();
-
-    // Check if an object is detected within the specified range
-    if (distance > 0 && distance < MAX_DISTANCE) {
-      // Object detected, set the flag to 1
-      flag = 1;
-    } else {
-      // No object detected, set the flag to 0
-      flag = 0;
-    }
-
-    // Print the distance and flag status
-    Serial.print("Distance: ");
-    Serial.print(distance);
-    Serial.print(" cm, Flag: ");
-    Serial.println(flag);
-  }
+  sensor();
 
   if (flag == 0)
     runServoPrgV(servoPrg02, servoPrg02step); //move forward
   if (flag == 1){
     runServoPrgV(servoPrg03, servoPrg03step); //move backward
-    for(int i=0; i<3; i++){
+    while(flag == 1){
       runServoPrgV(servoPrg07, servoPrg07step); //turn right
+      sensor();
     }
   }
     
