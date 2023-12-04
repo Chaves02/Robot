@@ -15,23 +15,16 @@
 
 #include <Arduino.h>
 #include <Servo.h>
-#include <NewPing.h>
 #include <elapsedMillis.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
 #include <VL53L0X.h>
 
-// Define HC-SR04 sensor pins
-#define TRIGGER_PIN  17  // Arduino pin for trigger
-#define ECHO_PIN     16  // Arduino pin for echo
-#define MAX_DISTANCE 30 // Maximum distance in centimeters
+#define MAX_DISTANCE 300 // Maximum distance in milimeters
 
 //Create an instance of the VL53L0X library
 VL53L0X VL53L0X_sensor;
-
-// Create an instance of the NewPing library
-NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
 
 //Create an instance of the MPU6050 library
 Adafruit_MPU6050 mpu;
@@ -43,7 +36,6 @@ elapsedMillis timeElapsed;
 int flag = 0; // Flag for checking if an object is detected
 const long interval = 500;  // Interval for checking the sensor (in milliseconds)
 float giro_aux = 0; //variável auxiliar para o giroscópio
-
 
 const int numberOfServos = 8; // Number of servos
 const int numberOfACE = 9; // Number of action code elements
@@ -275,6 +267,8 @@ int servoPrg15 [][numberOfACE]  = {
   {    0,  45,  45,   0,   0, -45, -45,   0,  300  }, // standby
 };
 
+///////////////////////////////////////////////////////////function///////////////////////////////////////////////////////////
+
 //runServoPrg
 void runServoPrg(int servoPrg[][numberOfACE], int step)
 {
@@ -325,33 +319,6 @@ void runServoPrgV(int servoPrg[][numberOfACE], int step) {
 }
 
 //check sensor
-//int sensor() {
-//  if (timeElapsed >= interval) {
-//    timeElapsed = 0; 
-//
-//    // Perform the sensor reading
-//    int distance = sonar.ping_cm();
-//
-//    // Check if an object is detected within the specified range
-//    if (distance > 0 && distance < MAX_DISTANCE) {
-//      // Object detected, set the flag to 1
-//      flag = 1;
-//    } else {
-//      // No object detected, set the flag to 0
-//      flag = 0;
-//    }
-//
-//    // Print the distance and flag status
-//    Serial.print("Distance: ");
-//    Serial.print(distance);
-//    Serial.print(" cm, Flag: ");
-//    Serial.println(flag); 
-//  }
-//  return flag;
-//}
-
-
-//check sensor
 int sensor() {
   if (timeElapsed >= interval) {
     timeElapsed = 0; 
@@ -359,9 +326,8 @@ int sensor() {
     // Perform the sensor reading
     uint16_t distance = VL53L0X_sensor.readRangeSingleMillimeters();
 
-
     // Check if an object is detected within the specified range
-    if (distance > 0 && distance < MAX_DISTANCE * 10) {
+    if (distance > 0 && distance < MAX_DISTANCE) {
       // Object detected, set the flag to 1
       flag = 1;
     } else {
@@ -379,22 +345,33 @@ int sensor() {
 }
 
 
+///////////////////////////////////////////////////////////setup///////////////////////////////////////////////////////////
 //Setup
 void setup() {
 
-  Wire.begin();
   Serial.begin(115200);
-  ////while (!Serial)
-  delay(500); // will pause Zero, Leonardo, etc until serial console opens
-  Serial.println("Adafruit MPU6050 test!");
+  delay(1000);
+  Serial.println("Serial Monitor Started");
 
-  VL53L0X_sensor.init();
+  Wire.begin(); // join i2c bus
+
+  if(!VL53L0X_sensor.init(0x29))
+  {
+    Serial.println("Failed to detect and initialize sensor!");
+    while(1){
+      runServoPrgV(servoPrg01, servoPrg01step); //standby
+    }
+  }
+  Serial.println("VL53L0X sensor detected!");
+
   VL53L0X_sensor.setTimeout(500);
 
   // Try to initialize!
-  if (!mpu.begin()) {
+  if (!mpu.begin(0x68)) {
     Serial.println("Failed to find MPU6050 chip");
-    //while (1);
+    while (1){
+      runServoPrgV(servoPrg01, servoPrg01step); //standby
+    }
   }
   Serial.println("MPU6050 Found!");
 
@@ -407,9 +384,8 @@ void setup() {
   mpu.setMotionInterrupt(true);
 
   Serial.println("");
-  delay(100);
+  delay(1000);
 
-  //Serial.begin(9600);
   // Servo Pin Set
   servo[0].attach(0);
   servo[1].attach(1);
@@ -473,10 +449,9 @@ void loop() {
       giro_aux += g.gyro.z;
       Serial.println(giro_aux);
       
-      //if(giro_aux > -20) //enquanto não tiver rodado 90º, refaz ativando flag
-      //  flag = 1;
-      //else 
-      if(sensor() == 0){ //se não tiver mais nada na frente, desativa flag
+      if(giro_aux > -20) //enquanto não tiver rodado 90º, refaz ativando flag
+        flag = 1;
+      else if(sensor() == 0){ //se não tiver mais nada na frente, desativa flag
         giro_aux = 0;
       }
     }
@@ -539,7 +514,5 @@ void loop() {
   //
   //for(int i=0; i<15; i++){
   //  runServoPrgV(servoPrg01, servoPrg01step); //stand-by
-  //}
-
-  
+  //} 
 }
