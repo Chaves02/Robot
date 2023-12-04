@@ -17,18 +17,33 @@
 #include <Servo.h>
 #include <NewPing.h>
 #include <elapsedMillis.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+#include <Wire.h>
+#include <VL53L0X.h>
 
 // Define HC-SR04 sensor pins
 #define TRIGGER_PIN  17  // Arduino pin for trigger
 #define ECHO_PIN     16  // Arduino pin for echo
 #define MAX_DISTANCE 30 // Maximum distance in centimeters
 
+//Create an instance of the VL53L0X library
+VL53L0X VL53L0X_sensor;
+
 // Create an instance of the NewPing library
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
+
+//Create an instance of the MPU6050 library
+Adafruit_MPU6050 mpu;
+
+// Create an instance of the sensor event
+sensors_event_t a, g, temp;
 
 elapsedMillis timeElapsed; 
 int flag = 0; // Flag for checking if an object is detected
 const long interval = 500;  // Interval for checking the sensor (in milliseconds)
+float giro_aux = 0; //variável auxiliar para o giroscópio
+
 
 const int numberOfServos = 8; // Number of servos
 const int numberOfACE = 9; // Number of action code elements
@@ -39,12 +54,11 @@ int servoPrgPeriod = 20; // 50 ms
 Servo servo[numberOfServos]; // Servo object
 
 // Zero
-int servoPrg00step = 1;
-int servoPrg00 [][numberOfACE]  = {
+int ZeroStep = 1;
+int Zero [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
   {  0,  45, 135, 180, 180, 135,  45,  0, 1000  }, // zero position          /////////check///////////
 };
-
 
 // Standby
 int servoPrg01step = 2;
@@ -55,8 +69,8 @@ int servoPrg01 [][numberOfACE]  = {
 };
 
 // Forward
-int servoPrg02step = 11;
-int servoPrg02 [][numberOfACE]  = {
+int ForwardStep = 11;
+int Forward [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
   {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby               ////////check//////
   {   20,   0,   0,   0,   0,   0, -45,  20,  100  }, // leg1,4 up; leg4 fw
@@ -72,8 +86,8 @@ int servoPrg02 [][numberOfACE]  = {
 };
 
 // Backward
-int servoPrg03step = 11;
-int servoPrg03 [][numberOfACE]  = {
+int BackwardStep = 11;
+int Backward [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
   {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby                ////////check////////
   {   20, -45,   0,   0,   0,   0,   0,  20,  100  }, // leg4,1 up; leg1 fw
@@ -89,8 +103,8 @@ int servoPrg03 [][numberOfACE]  = {
 };
 
 // Move Left
-int servoPrg04step = 11;
-int servoPrg04 [][numberOfACE]  = {
+int MoveleftStep = 11;
+int Moveleft [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
   {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby                  ////////check////////
   {    0,   0, -45, -20, -20,   0,   0,   0,  100  }, // leg3,2 up; leg2 fw
@@ -106,8 +120,8 @@ int servoPrg04 [][numberOfACE]  = {
 };
 
 // Move Right
-int servoPrg05step = 11;
-int servoPrg05 [][numberOfACE]  = {
+int MoverightStep = 11;
+int Moveright [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
   {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby                ////////check////////
   {    0,   0,   0, -20, -20, -45,   0,   0,  100  }, // leg2,3 up; leg3 fw
@@ -261,6 +275,7 @@ int servoPrg15 [][numberOfACE]  = {
   {    0,  45,  45,   0,   0, -45, -45,   0,  300  }, // standby
 };
 
+//runServoPrg
 void runServoPrg(int servoPrg[][numberOfACE], int step)
 {
   for (int i = 0; i < step; i++) { // Loop for step
@@ -309,15 +324,44 @@ void runServoPrgV(int servoPrg[][numberOfACE], int step) {
   }
 }
 
-void sensor() {
+//check sensor
+//int sensor() {
+//  if (timeElapsed >= interval) {
+//    timeElapsed = 0; 
+//
+//    // Perform the sensor reading
+//    int distance = sonar.ping_cm();
+//
+//    // Check if an object is detected within the specified range
+//    if (distance > 0 && distance < MAX_DISTANCE) {
+//      // Object detected, set the flag to 1
+//      flag = 1;
+//    } else {
+//      // No object detected, set the flag to 0
+//      flag = 0;
+//    }
+//
+//    // Print the distance and flag status
+//    Serial.print("Distance: ");
+//    Serial.print(distance);
+//    Serial.print(" cm, Flag: ");
+//    Serial.println(flag); 
+//  }
+//  return flag;
+//}
+
+
+//check sensor
+int sensor() {
   if (timeElapsed >= interval) {
     timeElapsed = 0; 
 
     // Perform the sensor reading
-    int distance = sonar.ping_cm();
+    uint16_t distance = VL53L0X_sensor.readRangeSingleMillimeters();
+
 
     // Check if an object is detected within the specified range
-    if (distance > 0 && distance < MAX_DISTANCE) {
+    if (distance > 0 && distance < MAX_DISTANCE * 10) {
       // Object detected, set the flag to 1
       flag = 1;
     } else {
@@ -328,24 +372,53 @@ void sensor() {
     // Print the distance and flag status
     Serial.print("Distance: ");
     Serial.print(distance);
-    Serial.print(" cm, Flag: ");
-    Serial.println(flag);
-
+    Serial.print(" mm, Flag: ");
+    Serial.println(flag); 
   }
+  return flag;
 }
 
+
+//Setup
 void setup() {
 
-  Serial.begin(9600);
+  Wire.begin();
+  Serial.begin(115200);
+  ////while (!Serial)
+  delay(500); // will pause Zero, Leonardo, etc until serial console opens
+  Serial.println("Adafruit MPU6050 test!");
+
+  VL53L0X_sensor.init();
+  VL53L0X_sensor.setTimeout(500);
+
+  // Try to initialize!
+  if (!mpu.begin()) {
+    Serial.println("Failed to find MPU6050 chip");
+    //while (1);
+  }
+  Serial.println("MPU6050 Found!");
+
+  //setup motion detection
+  mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
+  mpu.setMotionDetectionThreshold(1);
+  mpu.setMotionDetectionDuration(20);
+  mpu.setInterruptPinLatch(true);	// Keep it latched.  Will turn off when reinitialized.
+  mpu.setInterruptPinPolarity(true);
+  mpu.setMotionInterrupt(true);
+
+  Serial.println("");
+  delay(100);
+
+  //Serial.begin(9600);
   // Servo Pin Set
   servo[0].attach(0);
   servo[1].attach(1);
   servo[2].attach(2);
   servo[3].attach(3);
-  servo[4].attach(4);
-  servo[5].attach(5);
-  servo[6].attach(6);
-  servo[7].attach(7);
+  servo[4].attach(6);
+  servo[5].attach(7);
+  servo[6].attach(8);
+  servo[7].attach(9);
   
   servo[0].write(90 + servoCal[0]);
   servo[1].write(90 + servoCal[1]);
@@ -358,41 +431,72 @@ void setup() {
 
   delay(2000);
 
-  runServoPrg(servoPrg00, servoPrg00step); // zero position
+  runServoPrg(Zero, ZeroStep); // zero position
 
   delay(2000);
-
 }
 
+//Loop
 void loop() {
 
-  sensor();
+   // mpu.getEvent(&a, &g, &temp);
+   // Serial.print("Temperature: ");
+   // Serial.println(temp.temperature);
+//
+   // /* Print out the values */
+   // Serial.print("AccelX:");
+   // Serial.print(a.acceleration.x);
+   // Serial.print(",");
+   // Serial.print("AccelY:");
+   // Serial.print(a.acceleration.y);
+   // Serial.print(",");
+   // Serial.print("AccelZ:");
+   // Serial.print(a.acceleration.z);
+   // Serial.print(", ");
+   // Serial.print("GyroX:");
+   // Serial.print(g.gyro.x);
+   // Serial.print(",");
+   // Serial.print("GyroY:");
+   // Serial.print(g.gyro.y);
+   // Serial.print(",");
+   // Serial.print("GyroZ:");
+   // Serial.print(g.gyro.z);
+   // Serial.println("");
 
-  if (flag == 0)
-    runServoPrgV(servoPrg02, servoPrg02step); //move forward
-  if (flag == 1){
-    runServoPrgV(servoPrg03, servoPrg03step); //move backward
+  if (sensor() == 0)
+    runServoPrgV(Forward, ForwardStep); //move forward
+  if (sensor() == 1){
+    runServoPrgV(Backward, BackwardStep); //move backward
     while(flag == 1){
       runServoPrgV(servoPrg07, servoPrg07step); //turn right
-      sensor();
+      mpu.getEvent(&a, &g, &temp);
+      giro_aux += g.gyro.z;
+      Serial.println(giro_aux);
+      
+      //if(giro_aux > -20) //enquanto não tiver rodado 90º, refaz ativando flag
+      //  flag = 1;
+      //else 
+      if(sensor() == 0){ //se não tiver mais nada na frente, desativa flag
+        giro_aux = 0;
+      }
     }
   }
     
     
   //for(int i=0; i<5; i++){
-  //  runServoPrgV(servoPrg02, servoPrg02step); //move forward
+  //  runServoPrgV(Forward, ForwardStep); //move forward
   //}
 //
   //for(int i=0; i<5; i++){
-  //  runServoPrgV(servoPrg03, servoPrg03step); //move backward
+  //  runServoPrgV(Backward, BackwardStep); //move backward
   //}
 //
   //for(int i=0; i<5; i++){
-  //  runServoPrgV(servoPrg04, servoPrg04step); //move left
+  //  runServoPrgV(Moveleft, MoveleftStep); //move left
   //}
 //
   //for(int i=0; i<5; i++){
-  //  runServoPrgV(servoPrg05, servoPrg05step); //move right
+  //  runServoPrgV(Moveright, MoverightStep); //move right
   //}
 //
   //for(int i=0; i<5; i++){
