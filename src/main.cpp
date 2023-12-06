@@ -16,26 +16,59 @@
 #include <Arduino.h>
 #include <Servo.h>
 #include <elapsedMillis.h>
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
 #include <Wire.h>
 #include <VL53L0X.h>
+#include "I2Cdev.h"
+#include "MPU6050_6Axis_MotionApps20.h"
+#include <PID_v1.h>
 
 #define MAX_DISTANCE 300 // Maximum distance in milimeters
 
 //Create an instance of the VL53L0X library
 VL53L0X VL53L0X_sensor;
 
-//Create an instance of the MPU6050 library
-Adafruit_MPU6050 mpu;
+MPU6050 mpu(0x68); // MPU6050 object
 
-// Create an instance of the sensor event
-sensors_event_t a, g, temp;
+// MPU control/status vars
+bool dmpReady = false;  // set true if DMP init was successful
+//uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
+uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
+uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
+uint16_t fifoCount;     // count of all bytes currently in FIFO
+uint8_t fifoBuffer[64]; // FIFO storage buffer
+
+// orientation/motion vars
+Quaternion q;           // [w, x, y, z]         quaternion container
+VectorInt16 aa;         // [x, y, z]            accel sensor measurements
+VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
+VectorInt16 aaWorld;    // [x, y, z]            world-frame accel sensor measurements
+VectorFloat gravity;    // [x, y, z]            gravity vector
+float euler[3];         // [psi, theta, phi]    Euler angle container
+float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
+
+// packet structure for InvenSense teapot demo
+uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\n' };
 
 elapsedMillis timeElapsed; 
 int flag = 0; // Flag for checking if an object is detected
 const long interval = 500;  // Interval for checking the sensor (in milliseconds)
-float giro_aux = 0; //variável auxiliar para o giroscópio
+
+//Define Variables we'll be connecting to
+double Setpoint, Input, Output;
+
+//Specify the links and initial tuning parameters
+double Kp=0.8, Ki=1, Kd=0;
+PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
+
+typedef enum{
+  Front,
+  Right,
+  Left
+} state;
+
+state currentState = Front;
+int side = 0;
+int aux = 0;
 
 const int numberOfServos = 8; // Number of servos
 const int numberOfACE = 9; // Number of action code elements
@@ -344,48 +377,63 @@ int sensor() {
   return flag;
 }
 
-
-///////////////////////////////////////////////////////////setup///////////////////////////////////////////////////////////
-//Setup
-void setup() {
-
-  Serial.begin(115200);
-  delay(1000);
-  Serial.println("Serial Monitor Started");
-
-  Wire.begin(); // join i2c bus
-
+//sensorSetup
+void sensorSetup() {
+  // Initialize the sensor
   if(!VL53L0X_sensor.init(0x29))
   {
     Serial.println("Failed to detect and initialize sensor!");
-    while(1){
-      runServoPrgV(servoPrg01, servoPrg01step); //standby
-    }
   }
   Serial.println("VL53L0X sensor detected!");
-
   VL53L0X_sensor.setTimeout(500);
+}
 
-  // Try to initialize!
-  if (!mpu.begin(0x68)) {
+//mpuSetup
+void mpuSetup() {
+
+  mpu.initialize(); // initialize MPU6050
+  if (!mpu.testConnection()) {
     Serial.println("Failed to find MPU6050 chip");
-    while (1){
-      runServoPrgV(servoPrg01, servoPrg01step); //standby
-    }
   }
   Serial.println("MPU6050 Found!");
 
-  //setup motion detection
-  mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
-  mpu.setMotionDetectionThreshold(1);
-  mpu.setMotionDetectionDuration(20);
-  mpu.setInterruptPinLatch(true);	// Keep it latched.  Will turn off when reinitialized.
-  mpu.setInterruptPinPolarity(true);
-  mpu.setMotionInterrupt(true);
+  // load and configure the DMP
+  Serial.println(F("Initializing DMP..."));
+  devStatus = mpu.dmpInitialize();
 
-  Serial.println("");
-  delay(1000);
+  // supply your own gyro offsets here, scaled for min sensitivity
+  mpu.setXAccelOffset(1047);
+  mpu.setYAccelOffset(873);
+  mpu.setZAccelOffset(1369);
+  mpu.setXGyroOffset(133);
+  mpu.setYGyroOffset(-86);
+  mpu.setZGyroOffset(-12);
 
+  // make sure it worked (returns 0 if so)
+  if (devStatus == 0) {
+    // Calibration Time: generate offsets and calibrate our MPU6050
+    //mpu.CalibrateAccel(6);
+    //mpu.CalibrateGyro(6);
+    mpu.PrintActiveOffsets();
+    // turn on the DMP, now that it's ready
+    Serial.println(F("Enabling DMP..."));
+    mpu.setDMPEnabled(true);
+    dmpReady = true;
+
+    packetSize = mpu.dmpGetFIFOPacketSize();
+  } else {
+    // ERROR!
+    // 1 = initial memory load failed
+    // 2 = DMP configuration updates failed
+    // (if it's going to break, usually the code will be 1)
+    Serial.print(F("DMP Initialization failed (code "));
+    Serial.print(devStatus);
+    Serial.println(F(")"));
+  }
+}
+
+//servoSetup
+void servoSetup() {
   // Servo Pin Set
   servo[0].attach(0);
   servo[1].attach(1);
@@ -404,6 +452,60 @@ void setup() {
   servo[5].write(90 + servoCal[5]);
   servo[6].write(90 + servoCal[6]);
   servo[7].write(90 + servoCal[7]);
+}
+
+//PIDSetup
+void PIDSetup(){
+  //turn the PID on
+  myPID.SetMode(AUTOMATIC);
+  myPID.SetOutputLimits(-20, 20); //set the output limits
+  myPID.SetSampleTime(10); //refresh rate
+  myPID.SetTunings(Kp, Ki, Kd); //set PID gains
+  Setpoint = 0; //setpoint
+}
+
+void MoveUpdateIn(){
+  aux = Output;
+  Forward[4][1] = Forward[4][1] + aux;
+  Forward[6][1] = Forward[6][1] - aux;
+  Forward[4][2] = Forward[4][2] - aux;
+  Forward[7][2] = Forward[7][2] + aux;
+  Forward[7][5] = Forward[7][5] + aux;
+  Forward[10][5] = Forward[10][5] - aux;
+  Forward[1][6] = Forward[1][6] - aux;
+  Forward[4][6] = Forward[4][6] + aux;
+}
+
+void MoveUpdateOut(){
+  Forward[4][1] = Forward[4][1] - aux;
+  Forward[6][1] = Forward[6][1] + aux;
+  Forward[4][2] = Forward[4][2] + aux;
+  Forward[7][2] = Forward[7][2] - aux;
+  Forward[7][5] = Forward[7][5] - aux;
+  Forward[10][5] = Forward[10][5] + aux;
+  Forward[1][6] = Forward[1][6] + aux;
+  Forward[4][6] = Forward[4][6] - aux;
+}
+
+///////////////////////////////////////////////////////////setup///////////////////////////////////////////////////////////
+
+//Setup
+void setup() {
+
+  Wire.begin(); // join i2c bus
+  Wire.setClock(400000); // 400kHz I2C clock. Comment this line if having compilation difficulties
+
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("Serial Monitor Started");
+
+  sensorSetup(); //sensor setup
+
+  mpuSetup(); //mpu setup
+
+  servoSetup(); //servo setup
+
+  PIDSetup(); //PID setup
 
   delay(2000);
 
@@ -412,107 +514,92 @@ void setup() {
   delay(2000);
 }
 
+///////////////////////////////////////////////////////////loop///////////////////////////////////////////////////////////
+
 //Loop
 void loop() {
 
-   // mpu.getEvent(&a, &g, &temp);
-   // Serial.print("Temperature: ");
-   // Serial.println(temp.temperature);
-//
-   // /* Print out the values */
-   // Serial.print("AccelX:");
-   // Serial.print(a.acceleration.x);
-   // Serial.print(",");
-   // Serial.print("AccelY:");
-   // Serial.print(a.acceleration.y);
-   // Serial.print(",");
-   // Serial.print("AccelZ:");
-   // Serial.print(a.acceleration.z);
-   // Serial.print(", ");
-   // Serial.print("GyroX:");
-   // Serial.print(g.gyro.x);
-   // Serial.print(",");
-   // Serial.print("GyroY:");
-   // Serial.print(g.gyro.y);
-   // Serial.print(",");
-   // Serial.print("GyroZ:");
-   // Serial.print(g.gyro.z);
-   // Serial.println("");
+  mpu.dmpGetCurrentFIFOPacket(fifoBuffer); // read a packet from FIFO
+  mpu.dmpGetQuaternion(&q, fifoBuffer);
+  mpu.dmpGetGravity(&gravity, &q);
+  mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
-  if (sensor() == 0)
-    runServoPrgV(Forward, ForwardStep); //move forward
-  if (sensor() == 1){
-    runServoPrgV(Backward, BackwardStep); //move backward
-    while(flag == 1){
-      runServoPrgV(servoPrg07, servoPrg07step); //turn right
-      mpu.getEvent(&a, &g, &temp);
-      giro_aux += g.gyro.z;
-      Serial.println(giro_aux);
-      
-      if(giro_aux > -20) //enquanto não tiver rodado 90º, refaz ativando flag
-        flag = 1;
-      else if(sensor() == 0){ //se não tiver mais nada na frente, desativa flag
-        giro_aux = 0;
+  Input = ypr[0] * 180/M_PI;
+  
+  Serial.print("Input: ");
+  Serial.println(Input);
+  Serial.print("Output: ");
+  Serial.println(Output);
+  Serial.print("Setpoint: ");
+  Serial.println(Setpoint);
+
+  // if programming failed, don't try to do anything
+  if (!dmpReady) return;
+
+  switch (currentState) {
+    case Front:
+
+      Setpoint = 0;
+      myPID.Compute(); //compute PID
+
+      MoveUpdateIn();
+      runServoPrgV(Forward, ForwardStep); //move forward
+      MoveUpdateOut();
+
+      if(sensor() == 1 && side == 0){
+        runServoPrgV(Backward, BackwardStep); //move backward
+        for(int i=0; i<5; i++){
+          runServoPrgV(servoPrg07, servoPrg07step); //turn right
+        }
+        currentState = Right;
       }
-    }
-  }
-    
-    
-  //for(int i=0; i<5; i++){
-  //  runServoPrgV(Forward, ForwardStep); //move forward
-  //}
-//
-  //for(int i=0; i<5; i++){
-  //  runServoPrgV(Backward, BackwardStep); //move backward
-  //}
-//
-  //for(int i=0; i<5; i++){
-  //  runServoPrgV(Moveleft, MoveleftStep); //move left
-  //}
-//
-  //for(int i=0; i<5; i++){
-  //  runServoPrgV(Moveright, MoverightStep); //move right
-  //}
-//
-  //for(int i=0; i<5; i++){
-  //  runServoPrgV(servoPrg06, servoPrg06step); //turn left
-  //}
-  //
-  //for(int i=0; i<5; i++){
-  //  runServoPrgV(servoPrg07, servoPrg07step); //turn right
-  //}
-//
-  //for(int i=0; i<5; i++){
-  //  runServoPrgV(servoPrg08, servoPrg08step); //lie
-  //}
-//
-  //for(int i=0; i<5; i++){
-  //  runServoPrgV(servoPrg09, servoPrg09step); //say hi
-  //}
-//
-  //for(int i=0; i<5; i++){
-  //  runServoPrgV(servoPrg10, servoPrg10step); //fighting
-  //}
-//
-  //for(int i=0; i<5; i++){
-  //  runServoPrgV(servoPrg11, servoPrg11step); //push up
-  //}
-//
-  //for(int i=0; i<5; i++){
-  //  runServoPrgV(servoPrg12, servoPrg12step); //sleep
-  //}
-//
-  //for(int i=0; i<5; i++){
-  //  runServoPrgV(servoPrg13, servoPrg13step); //dancing 1
-  //}
-  //for(int i=0; i<5; i++){
-  //  runServoPrgV(servoPrg14, servoPrg14step); //dancing 2
-  //}
-  // for(int i=0; i<5; i++){
-  //  runServoPrgV(servoPrg15, servoPrg15step); //dancing 3
-  //}
-  //
-  //for(int i=0; i<15; i++){
-  //  runServoPrgV(servoPrg01, servoPrg01step); //stand-by
-  //} 
-}
+
+      if(sensor() == 1 && side == 1){
+        runServoPrgV(Backward, BackwardStep); //move backward
+        for(int i=0; i<5; i++){
+          runServoPrgV(servoPrg06, servoPrg06step); //turn left
+        }
+        currentState = Left;
+      }
+
+      break;
+
+    case Right:
+
+      Setpoint = 90;
+      myPID.Compute(); //compute PID
+
+      MoveUpdateIn();
+      runServoPrgV(Forward, ForwardStep); //move forward
+      MoveUpdateOut();
+
+      if(sensor() == 1){
+        runServoPrgV(Backward, BackwardStep); //move backward
+        for(int i=0; i<5; i++){
+          runServoPrgV(servoPrg06, servoPrg06step); //turn left
+        }
+        side = 1;
+        currentState = Front;
+      }
+      break;
+
+    case Left:
+
+      Setpoint = -90;
+      myPID.Compute(); //compute PID
+
+      MoveUpdateIn();
+      runServoPrgV(Forward, ForwardStep); //move forward
+      MoveUpdateOut();
+
+      if(sensor() == 1){
+        runServoPrgV(Backward, BackwardStep); //move backward
+        for(int i=0; i<5; i++){
+          runServoPrgV(servoPrg07, servoPrg07step); //turn right
+        }
+        side = 0;
+        currentState = Front;
+      }
+      break;
+  }  
+} //end of loop
