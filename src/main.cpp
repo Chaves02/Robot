@@ -57,7 +57,7 @@ const long interval = 500;  // Interval for checking the sensor (in milliseconds
 double Setpoint, Input, Output;
 
 //Specify the links and initial tuning parameters
-double Kp=0.8, Ki=1, Kd=0;
+double Kp=0.8, Ki=5, Kd=0;
 PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
 typedef enum{
