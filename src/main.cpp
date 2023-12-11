@@ -22,7 +22,7 @@
 #include "MPU6050_6Axis_MotionApps20.h"
 #include <PID_v1.h>
 
-#define MAX_DISTANCE 300 // Maximum distance in milimeters
+#define MAX_DISTANCE 150 // Maximum distance in milimeters
 
 //Create an instance of the VL53L0X library
 VL53L0X VL53L0X_sensor;
@@ -54,22 +54,26 @@ int flag = 0; // Flag for checking if an object is detected
 const long interval = 500;  // Interval for checking the sensor (in milliseconds)
 
 //Define Variables we'll be connecting to
-double Setpoint, Input, Output;
+double Setpoint, directionAngle, Output;
+double Setpoint2, climbAngle, Output2;
 
 //Specify the links and initial tuning parameters
 double Kp=0.8, Ki=5, Kd=0;
-PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
+PID myPID(&directionAngle, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
+double Kp2=2, Ki2=0, Kd2=0;
+PID myPID2(&climbAngle, &Output2, &Setpoint2, Kp2, Ki2, Kd2, DIRECT);
 
 typedef enum{
   Front,
   Right,
-  Left,
-  Back
+  Left
+  //Back
 } state;
 
 state currentState = Front;
 int side = 0;
-int aux = 0;
+int aux_direction = 0;
+int aux_climb = 0;
 
 const int numberOfServos = 8; // Number of servos
 const int numberOfACE = 9; // Number of action code elements
@@ -83,7 +87,8 @@ Servo servo[numberOfServos]; // Servo object
 int ZeroStep = 1;
 int Zero [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {  0,  45, 135, 180, 180, 135,  45,  0, 1000  }, // zero position          /////////check///////////
+  //{  0,  45, 135, 180, 180, 135,  45,  0, 1000  }, // zero position          /////////check///////////
+  {  0,  90, 90, 180, 180, 90,  90,  0, 1000  }, // zero position          /////////check///////////
 };
 
 // Standby
@@ -98,17 +103,17 @@ int servoPrg01 [][numberOfACE]  = {
 int ForwardStep = 11;
 int Forward [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby               ////////check//////
-  {   20,   0,   0,   0,   0,   0, -45,  20,  100  }, // leg1,4 up; leg4 fw
-  {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg1,4 dn
-  {    0,   0,   0, -20, -20,   0,   0,   0,  100  }, // leg2,3 up
-  {    0, -57,  57,   0,   0,   0,  45,   0,  100  }, // leg1,4 bk; leg2 fw
-  {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg2,3 dn
-  {   20,  57,   0,   0,   0,   0,   0,  20,  100  }, // leg1,4 up; leg1 fw
-  {    0,   0, -57,   0,   0,  45,   0,   0,  100  }, // leg2,3 bk
-  {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg1,4 dn
-  {    0,   0,   0,   0, -20,   0,   0,   0,  100  }, // leg3 up
-  {    0,   0,   0,   0,  20, -45,   0,   0,  100  }, // leg3 fw dn
+  {   20,  90,  90, 160, 160,  90,  90,  20,  100  }, // standby               ////////check//////
+  {   40,   0,   0,   0,   0,   0, -60,  40,  100  }, // leg1,4 up; leg4 fw
+  {  -40,   0,   0,   0,   0,   0,   0, -40,  100  }, // leg1,4 dn
+  {    0,   0,   0, -40, -40,   0,   0,   0,  100  }, // leg2,3 up
+  {    0, -60,  60,   0,   0,   0,  60,   0,  100  }, // leg1,4 bk; leg2 fw
+  {    0,   0,   0,  40,  40,   0,   0,   0,  100  }, // leg2,3 dn
+  {   40,  60,   0,   0,   0,   0,   0,  40,  100  }, // leg1,4 up; leg1 fw
+  {    0,   0, -60,   0,   0,  60,   0,   0,  100  }, // leg2,3 bk
+  {  -40,   0,   0,   0,   0,   0,   0, -40,  100  }, // leg1,4 dn
+  {    0,   0,   0,   0, -40,   0,   0,   0,  100  }, // leg3 up
+  {    0,   0,   0,   0,  40, -60,   0,   0,  100  }, // leg3 fw dn
 };
 
 // Backward
@@ -403,18 +408,18 @@ void mpuSetup() {
   devStatus = mpu.dmpInitialize();
 
   // supply your own gyro offsets here, scaled for min sensitivity
-  mpu.setXAccelOffset(1047);
-  mpu.setYAccelOffset(873);
-  mpu.setZAccelOffset(1369);
-  mpu.setXGyroOffset(133);
-  mpu.setYGyroOffset(-86);
-  mpu.setZGyroOffset(-12);
+  //mpu.setXAccelOffset(1047);
+  //mpu.setYAccelOffset(873);
+  //mpu.setZAccelOffset(1369);
+  //mpu.setXGyroOffset(133);
+  //mpu.setYGyroOffset(-86);
+  //mpu.setZGyroOffset(-12);
 
   // make sure it worked (returns 0 if so)
   if (devStatus == 0) {
     // Calibration Time: generate offsets and calibrate our MPU6050
-    //mpu.CalibrateAccel(6);
-    //mpu.CalibrateGyro(6);
+    mpu.CalibrateAccel(20);
+    mpu.CalibrateGyro(20);
     mpu.PrintActiveOffsets();
     // turn on the DMP, now that it's ready
     Serial.println(F("Enabling DMP..."));
@@ -465,29 +470,61 @@ void PIDSetup(){
   Setpoint = 0; //setpoint
 }
 
+void PIDSetup2(){
+  //turn the PID on
+  myPID2.SetMode(AUTOMATIC);
+  myPID2.SetOutputLimits(-10, 10); //set the output limits
+  myPID2.SetSampleTime(10); //refresh rate
+  myPID2.SetTunings(Kp2, Ki2, Kd2); //set PID gains
+  Setpoint2 = 0; //setpoint
+}
+
 void MoveUpdateIn(){
-  aux = Output;
-  Forward[4][1] = Forward[4][1] + aux;
-  Forward[6][1] = Forward[6][1] - aux;
-  Forward[4][2] = Forward[4][2] - aux;
-  Forward[7][2] = Forward[7][2] + aux;
-  Forward[7][5] = Forward[7][5] + aux;
-  Forward[10][5] = Forward[10][5] - aux;
-  Forward[1][6] = Forward[1][6] - aux;
-  Forward[4][6] = Forward[4][6] + aux;
+  aux_direction = Output;
+  Forward[4][1] = Forward[4][1] + aux_direction;
+  Forward[6][1] = Forward[6][1] - aux_direction;
+  Forward[4][2] = Forward[4][2] - aux_direction;
+  Forward[7][2] = Forward[7][2] + aux_direction;
+  Forward[7][5] = Forward[7][5] + aux_direction;
+  Forward[10][5] = Forward[10][5] - aux_direction;
+  Forward[1][6] = Forward[1][6] - aux_direction;
+  Forward[4][6] = Forward[4][6] + aux_direction;
 }
 
 void MoveUpdateOut(){
-  Forward[4][1] = Forward[4][1] - aux;
-  Forward[6][1] = Forward[6][1] + aux;
-  Forward[4][2] = Forward[4][2] + aux;
-  Forward[7][2] = Forward[7][2] - aux;
-  Forward[7][5] = Forward[7][5] - aux;
-  Forward[10][5] = Forward[10][5] + aux;
-  Forward[1][6] = Forward[1][6] + aux;
-  Forward[4][6] = Forward[4][6] - aux;
+  Forward[4][1] = Forward[4][1] - aux_direction;
+  Forward[6][1] = Forward[6][1] + aux_direction;
+  Forward[4][2] = Forward[4][2] + aux_direction;
+  Forward[7][2] = Forward[7][2] - aux_direction;
+  Forward[7][5] = Forward[7][5] - aux_direction;
+  Forward[10][5] = Forward[10][5] + aux_direction;
+  Forward[1][6] = Forward[1][6] + aux_direction;
+  Forward[4][6] = Forward[4][6] - aux_direction;
 }
 
+void ClimbUpdateIn(){
+  aux_climb = Output2;
+  if((Forward[0][0] + aux_climb > 0 && Forward[0][0] + aux_climb < 40) &&
+      (Forward[0][3] + aux_climb > 140 && Forward[0][3] + aux_climb < 180) &&
+      (Forward[0][4] - aux_climb > 140 && Forward[0][4] - aux_climb < 180) &&
+      (Forward[0][7] - aux_climb > 0 && Forward[0][7] - aux_climb < 40)){
+
+    Forward[0][0] = Forward[0][0] + aux_climb;
+    Forward[0][3] = Forward[0][3] + aux_climb;
+    Forward[0][4] = Forward[0][4] - aux_climb;
+    Forward[0][7] = Forward[0][7] - aux_climb;
+  } 
+}
+
+void mpuGetValues(){
+  mpu.dmpGetCurrentFIFOPacket(fifoBuffer); // read a packet from FIFO
+  mpu.dmpGetQuaternion(&q, fifoBuffer);
+  mpu.dmpGetGravity(&gravity, &q);
+  mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+
+  directionAngle = ypr[0] * 180/M_PI;
+  climbAngle = ypr[2] * 180/M_PI;
+}
 ///////////////////////////////////////////////////////////setup///////////////////////////////////////////////////////////
 
 //Setup
@@ -499,20 +536,21 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("Serial Monitor Started");
+  
+  servoSetup(); //servo setup
 
+  runServoPrg(Zero, ZeroStep); // zero position
+  
+  delay(3000);
+  
   sensorSetup(); //sensor setup
 
   mpuSetup(); //mpu setup
 
-  servoSetup(); //servo setup
-
   PIDSetup(); //PID setup
 
-  delay(2000);
+  PIDSetup2(); //PID2 setup
 
-  runServoPrg(Zero, ZeroStep); // zero position
-
-  delay(2000);
 }
 
 ///////////////////////////////////////////////////////////loop///////////////////////////////////////////////////////////
@@ -520,24 +558,25 @@ void setup() {
 //Loop
 void loop() {
 
-  mpu.dmpGetCurrentFIFOPacket(fifoBuffer); // read a packet from FIFO
-  mpu.dmpGetQuaternion(&q, fifoBuffer);
-  mpu.dmpGetGravity(&gravity, &q);
-  mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-
-  Input = ypr[0] * 180/M_PI;
-
-    //mpu.dmpGetQuaternion(&q, fifoBuffer);
-    //mpu.dmpGetEuler(euler, &q);
-    //Serial.print("euler_angle\t");
-    //Serial.println(euler[0] * 180 / M_PI);
+  mpuGetValues(); //get values from mpu
   
-  Serial.print("Input: ");
-  Serial.println(Input);
+  Serial.print("Direction Input: ");
+  Serial.print(directionAngle);
+  Serial.print("  ");
   Serial.print("Output: ");
-  Serial.println(Output);
+  Serial.print(Output);
+  Serial.print("  ");
   Serial.print("Setpoint: ");
   Serial.println(Setpoint);
+
+  Serial.print("Climb Input: ");
+  Serial.print(climbAngle);
+  Serial.print("  ");
+  Serial.print("Output: ");
+  Serial.print(Output2);
+  Serial.print("  ");
+  Serial.print("Setpoint: ");
+  Serial.println(Setpoint2);
 
   // if programming failed, don't try to do anything
   if (!dmpReady) return;
@@ -547,6 +586,8 @@ void loop() {
 
       Setpoint = 0;
       myPID.Compute(); //compute PID
+      myPID2.Compute(); //compute PID2
+      ClimbUpdateIn(); //update climb
 
       MoveUpdateIn();
       runServoPrgV(Forward, ForwardStep); //move forward
@@ -554,85 +595,117 @@ void loop() {
 
       if(sensor() == 1 && side == 0){
         runServoPrgV(Backward, BackwardStep); //move backward
-        for(int i=0; i<5; i++){
+        while(directionAngle < 75){
           runServoPrgV(servoPrg07, servoPrg07step); //turn right
+          mpuGetValues(); //get values from mpu
         }
         currentState = Right;
       }
 
       if(sensor() == 1 && side == 1){
         runServoPrgV(Backward, BackwardStep); //move backward
-        for(int i=0; i<5; i++){
+        while(directionAngle > -75){
           runServoPrgV(servoPrg06, servoPrg06step); //turn left
+          mpuGetValues();
         }
         currentState = Left;
       }
 
-      break;
+    break;
 
     case Right:
 
       Setpoint = 90;
       myPID.Compute(); //compute PID
+      myPID2.Compute(); //compute PID2
+      ClimbUpdateIn(); //update climb
 
-      MoveUpdateIn();
-      runServoPrgV(Forward, ForwardStep); //move forward
-      MoveUpdateOut();
-
-      if(sensor() == 1){
-        runServoPrgV(Backward, BackwardStep); //move backward
-        for(int i=0; i<5; i++){
-          //runServoPrgV(servoPrg06, servoPrg06step); //turn left
-          runServoPrgV(servoPrg07, servoPrg07step); //turn right
-        }
-        //side = 1;
-        currentState = Back;
+      for(int i=0; i<7; i++){
+        MoveUpdateIn();
+        runServoPrgV(Forward, ForwardStep); //move forward
+        MoveUpdateOut();
       }
-      break;
+
+      while(directionAngle > 15 || directionAngle < -15){
+        runServoPrgV(servoPrg06, servoPrg06step); //turn left
+        mpuGetValues(); //get values from mpu
+        side = 1;
+      }
+      
+      currentState = Front;
+
+      //if(sensor() == 1){
+      //  runServoPrgV(Backward, BackwardStep); //move backward
+      //  for(int i=0; i<5; i++){
+      //    runServoPrgV(servoPrg06, servoPrg06step); //turn left
+      //    //runServoPrgV(servoPrg07, servoPrg07step); //turn right
+      //  }
+      //  side = 1;
+      //  currentState = Front;
+      //}
+    break;
 
     case Left:
 
       Setpoint = -90;
       myPID.Compute(); //compute PID
+      myPID2.Compute(); //compute PID2
+      ClimbUpdateIn(); //update climb
 
-      MoveUpdateIn();
-      runServoPrgV(Forward, ForwardStep); //move forward
-      MoveUpdateOut();
-
-      if(sensor() == 1){
-        runServoPrgV(Backward, BackwardStep); //move backward
-        for(int i=0; i<5; i++){
-          runServoPrgV(servoPrg07, servoPrg07step); //turn right
-        }
-        //side = 0;
-        currentState = Front;
-      }
-      break;
-
-    case Back:
-
-      if(ypr[0] * 180/M_PI > 0 && ypr[0] * 180/M_PI < 180){
-        Setpoint = 180;
-      }
-      else if(ypr[0] * 180/M_PI < 0 && ypr[0] * 180/M_PI > -180){
-        Setpoint = -180;
+      for(int i=0; i<7; i++){
+        MoveUpdateIn();
+        runServoPrgV(Forward, ForwardStep); //move forward
+        MoveUpdateOut();
       }
 
-      myPID.Compute(); //compute PID
-
-      MoveUpdateIn();
-      runServoPrgV(Forward, ForwardStep); //move forward
-      MoveUpdateOut();
-
-      if(sensor() == 1){
-        runServoPrgV(Backward, BackwardStep); //move backward
-        for(int i=0; i<5; i++){
-          runServoPrgV(servoPrg07, servoPrg07step); //turn right
-        }
-        //side = 0;
-        currentState = Left;
+      while(directionAngle > 15 || directionAngle < -15){
+        runServoPrgV(servoPrg07, servoPrg07step); //turn right
+        mpuGetValues(); //get values from mpu
+        side = 0;
       }
-      break;
-        
+
+      currentState = Front;
+
+      //MoveUpdateIn();
+      //runServoPrgV(Forward, ForwardStep); //move forward
+      //MoveUpdateOut();
+//
+      //if(sensor() == 1){
+      //  runServoPrgV(Backward, BackwardStep); //move backward
+      //  for(int i=0; i<5; i++){
+      //    runServoPrgV(servoPrg07, servoPrg07step); //turn right
+      //  }
+      //  side = 0;
+      //  currentState = Front;
+      //}
+    break;
+
+   // case Back:
+//
+   //   if(ypr[0] * 180/M_PI > 0 && ypr[0] * 180/M_PI < 180){
+   //     Setpoint = 180;
+   //   }
+   //   else if(ypr[0] * 180/M_PI < 0 && ypr[0] * 180/M_PI > -180){
+   //     Setpoint = -180;
+   //   }
+//
+   //   myPID.Compute(); //compute PID
+   //   myPID2.Compute(); //compute PID2
+   //   ClimbUpdateIn(); //update climb
+//
+   //   MoveUpdateIn();
+   //   runServoPrgV(Forward, ForwardStep); //move forward
+   //   MoveUpdateOut();
+//
+   //   if(sensor() == 1){
+   //     runServoPrgV(Backward, BackwardStep); //move backward
+   //     for(int i=0; i<5; i++){
+   //       runServoPrgV(servoPrg07, servoPrg07step); //turn right
+   //     }
+   //     //side = 0;
+   //     currentState = Left;
+   //   }
+   //   break;
+   //     
   }  
 } //end of loop
