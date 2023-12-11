@@ -63,7 +63,8 @@ PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 typedef enum{
   Front,
   Right,
-  Left
+  Left,
+  Back
 } state;
 
 state currentState = Front;
@@ -525,6 +526,11 @@ void loop() {
   mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
   Input = ypr[0] * 180/M_PI;
+
+    //mpu.dmpGetQuaternion(&q, fifoBuffer);
+    //mpu.dmpGetEuler(euler, &q);
+    //Serial.print("euler_angle\t");
+    //Serial.println(euler[0] * 180 / M_PI);
   
   Serial.print("Input: ");
   Serial.println(Input);
@@ -576,10 +582,11 @@ void loop() {
       if(sensor() == 1){
         runServoPrgV(Backward, BackwardStep); //move backward
         for(int i=0; i<5; i++){
-          runServoPrgV(servoPrg06, servoPrg06step); //turn left
+          //runServoPrgV(servoPrg06, servoPrg06step); //turn left
+          runServoPrgV(servoPrg07, servoPrg07step); //turn right
         }
-        side = 1;
-        currentState = Front;
+        //side = 1;
+        currentState = Back;
       }
       break;
 
@@ -597,9 +604,35 @@ void loop() {
         for(int i=0; i<5; i++){
           runServoPrgV(servoPrg07, servoPrg07step); //turn right
         }
-        side = 0;
+        //side = 0;
         currentState = Front;
       }
       break;
+
+    case Back:
+
+      if(ypr[0] * 180/M_PI > 0 && ypr[0] * 180/M_PI < 180){
+        Setpoint = 180;
+      }
+      else if(ypr[0] * 180/M_PI < 0 && ypr[0] * 180/M_PI > -180){
+        Setpoint = -180;
+      }
+
+      myPID.Compute(); //compute PID
+
+      MoveUpdateIn();
+      runServoPrgV(Forward, ForwardStep); //move forward
+      MoveUpdateOut();
+
+      if(sensor() == 1){
+        runServoPrgV(Backward, BackwardStep); //move backward
+        for(int i=0; i<5; i++){
+          runServoPrgV(servoPrg07, servoPrg07step); //turn right
+        }
+        //side = 0;
+        currentState = Left;
+      }
+      break;
+        
   }  
 } //end of loop
