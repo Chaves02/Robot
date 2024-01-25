@@ -22,13 +22,14 @@
 #include "MPU6050_6Axis_MotionApps20.h"
 #include <PID_v1.h>
 
-#define MAX_DISTANCE 135 // Maximum distance in milimeters
+#define BUTTON_PIN 17 // Button pin
 
+int MAX_DISTANCE = 135; // Maximum distance in milimeters
 VL53L0X VL53L0X_sensor; // VL53L0X object
-elapsedMillis timeElapsed; // Time elapsed since the last measurement
-const long interval = 500;  // Interval for checking the sensor (in milliseconds)
-
 MPU6050 mpu(0x68); // MPU6050 object
+elapsedMillis timeElapsed; // Time elapsed since the last measurement
+const long interval = 300;  // Interval for checking the sensor (in milliseconds)
+
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
 uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
@@ -58,20 +59,29 @@ typedef enum{ // State machine states
   Front,
   Right,
   Left,
+  Livre,
   Stair
 } state;
-
 state currentState = Front; // Initial state
 int side = 0; // last side
 int aux_direction = 0; // auxiliar variable for direction
 int aux_climb = 0; // auxiliar variable for climb
+
+typedef enum{
+  Mode1,
+  Mode2,
+  Mode3,
+  Mode4,
+  Mode5,
+} operation_mode;
+operation_mode currentMode = Mode1; // Initial mode
 
 const int numberOfServos = 8; // Number of servos
 const int numberOfACE = 9; // Number of action code elements
 int servoCal[] = { -3, -4, 2, -7, -5, 0, 0, 7 }; // Servo calibration data
 int servoPos[] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // Servo current position
 int servoPrevPrg[] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // Servo previous prg
-int servoPrgPeriod = 20; // 50 ms
+int servoPrgPeriod = 10; // 10 ms
 Servo servo[numberOfServos]; // Servo object
 
 ///////////////////////////// Robot Actions /////////////////////////////
@@ -84,11 +94,11 @@ int Zero [][numberOfACE]  = {
 };
 
 // Standby
-int StandbySet = 2;
+int StandbyStep = 2;
 int Standby [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
   {   90,  90,  90,  90,  90,  90,  90,  90,  200  }, // prep standby
-  {  -20,   0,   0,  20,  20,   0,   0, -20,  200  }, // standby
+  {  -30,   0,   0,  30,  30,   0,   0, -30,  200  }, // standby
 };
 
 // Check up
@@ -138,7 +148,7 @@ int ClimbStep = 33;
 int Climb [][numberOfACE]  = {
   // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
   {   15,  90,  90, 165, 165,  90,  90,  15,  200  }, // standby
-  {   20,   0,   0,   0,   0,   0, -50,  20,  200  }, // leg1,4 up; leg4 fw ///////////
+  {   20,   0,   0,   0,   0,   0, -50,  20,  200  }, // leg1,4 up; leg4 fw
   {  -20,   0,   0,   0,   0,   0,   0, -20,  200  }, // leg1,4 dn
   {    0,   0,   0, -20, -50,   0,   0,   0,  200  }, // leg2,3 up (gp4- 50)
   {    0, -50,  50,   0,   0,   0,  50,   0,  200  }, // leg1,4 bk; leg2 fw
@@ -147,9 +157,9 @@ int Climb [][numberOfACE]  = {
   {    0,   0, -50,   0,   0,  50,   0,   0,  200  }, // leg2,3 bk
   {  -50,   0,   0,   0,   0,   0,   0, -20,  200  }, // leg1,4 dn
   {    0,   0,   0,   0, -20,   0,   0,   0,  200  }, // leg3 up
-  {    0,   0,   0,   0,  20, -50,   0,   0,  200  }, // leg3 fw dn         ///////////
+  {    0,   0,   0,   0,  20, -50,   0,   0,  200  }, // leg3 fw dn
   {   20,   0,   0,   0, -20,   0,   0,   0,  200  }, // leg1,3 up   //baixa frente
-  {   40,   0,   0,   0,   0,   0, -50,  20,  200  }, // leg1,4 up; leg4 fw ///////////
+  {   40,   0,   0,   0,   0,   0, -50,  20,  200  }, // leg1,4 up; leg4 fw
   {  -40,   0,   0,   0,   0,   0,   0, -20,  200  }, // leg1,4 dn
   {    0,   0,   0, -20, -40,   0,   0,   0,  200  }, // leg2,3 up
   {    0, -50,  50,   0,   0,   0,  70,   0,  200  }, // leg1,4 bk; leg2 fw
@@ -180,10 +190,10 @@ int Moveleft [][numberOfACE]  = {
   {    0,   0, -45, -20, -20,   0,   0,   0,  100  }, // leg3,2 up; leg2 fw
   {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg3,2 dn
   {   20,   0,   0,   0,   0,   0,   0,  20,  100  }, // leg1,4 up
-  {    0,  65,  45,   0,   0, -65,   0,   0,  100  }, // leg3,2 bk; leg1 fw
+  {    0,  45,  45,   0,   0, -45,   0,   0,  100  }, // leg3,2 bk; leg1 fw
   {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg1,4 dn
-  {    0,   0,   0, -20, -20,  65,   0,   0,  100  }, // leg3,2 up; leg3 fw
-  {    0, -65,   0,   0,   0,   0,  45,   0,  100  }, // leg1,4 bk
+  {    0,   0,   0, -20, -20,  45,   0,   0,  100  }, // leg3,2 up; leg3 fw
+  {    0, -45,   0,   0,   0,   0,  45,   0,  100  }, // leg1,4 bk
   {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg3,2 dn
   {    0,   0,   0,   0,   0,   0,   0,  20,  100  }, // leg4 up
   {    0,   0,   0,   0,   0,   0, -45, -20,  100  }, // leg4 fw dn
@@ -197,10 +207,10 @@ int Moveright [][numberOfACE]  = {
   {    0,   0,   0, -20, -20, -45,   0,   0,  100  }, // leg2,3 up; leg3 fw
   {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg2,3 dn
   {   20,   0,   0,   0,   0,   0,   0,  20,  100  }, // leg4,1 up
-  {    0,   0, -70,   0,   0,  45,  65,   0,  100  }, // leg2,3 bk; leg4 fw
+  {    0,   0, -45,   0,   0,  45,  45,   0,  100  }, // leg2,3 bk; leg4 fw
   {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg4,1 dn
-  {    0,   0,  70, -20, -20,   0,   0,   0,  100  }, // leg2,3 up; leg2 fw
-  {    0,  45,   0,   0,   0,   0, -65,   0,  100  }, // leg4,1 bk
+  {    0,   0,  45, -20, -20,   0,   0,   0,  100  }, // leg2,3 up; leg2 fw
+  {    0,  45,   0,   0,   0,   0, -45,   0,  100  }, // leg4,1 bk
   {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg2,3 dn
   {   20,   0,   0,   0,   0,   0,   0,   0,  100  }, // leg1 up
   {  -20, -45,   0,   0,   0,   0,   0,   0,  100  }, // leg1 fw dn
@@ -458,8 +468,8 @@ void mpuSetup() {
   // make sure it worked (returns 0 if so)
   if (devStatus == 0) {
     // Calibration Time: generate offsets and calibrate our MPU6050
-    mpu.CalibrateAccel(20);
-    mpu.CalibrateGyro(20);
+    mpu.CalibrateAccel(30);
+    mpu.CalibrateGyro(30);
     mpu.PrintActiveOffsets();
     // turn on the DMP, now that it's ready
     Serial.println(F("Enabling DMP..."));
@@ -517,11 +527,11 @@ void PID2Setup(){
   myPID2.SetOutputLimits(-20, 20); //set the output limits
   myPID2.SetSampleTime(10); //refresh rate
   myPID2.SetTunings(Kp2, Ki2, Kd2); //set PID gains
-  Setpoint2 = Setpoint; //setpoint
+  Setpoint2 = 0; //setpoint
 }
 
-// Direction Update
-void MoveUpdate(){
+// Front Update
+void MoveFrontUpdate(){
   aux_direction = Output;
   Forward[4][1] = -45 + aux_direction;
   Forward[6][1] =  45 - aux_direction;
@@ -531,6 +541,32 @@ void MoveUpdate(){
   Forward[10][5]= -45 - aux_direction;
   Forward[1][6] = -45 - aux_direction;
   Forward[4][6] =  45 + aux_direction;
+}
+
+//Left Update
+void MoveLeftUpdate(){
+  aux_direction = Output;
+  Moveleft[4][1] = 45 - aux_direction;
+  Moveleft[7][1] =  -45 + aux_direction;
+  Moveleft[1][2] =  -45 - aux_direction;
+  Moveleft[4][2] = 45 + aux_direction;
+  Moveleft[4][5] =  -45 + aux_direction;
+  Moveleft[6][5]= 45 - aux_direction;
+  Moveleft[7][6] = 45 + aux_direction;
+  Moveleft[10][6] =  -45 - aux_direction;
+}
+
+//Right Update
+void MoveRightUpdate(){
+  aux_direction = Output;
+  Moveright[7][1] = 45 + aux_direction;
+  Moveright[10][1] =  -45 - aux_direction;
+  Moveright[4][2] =  -45 + aux_direction;
+  Moveright[6][2] = 45 - aux_direction;
+  Moveright[1][5] =  -45 - aux_direction;
+  Moveright[4][5]= 45 + aux_direction;
+  Moveright[4][6] = 45 - aux_direction;
+  Moveright[7][6] =  -45 + aux_direction;
 }
 
 // Climb Update
@@ -548,57 +584,21 @@ void mpuGetValues(){
   mpu.dmpGetQuaternion(&q, fifoBuffer);
   mpu.dmpGetGravity(&gravity, &q);
   mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-
   directionAngle = ypr[0] * 180/M_PI;
   climbAngle = ypr[2] * 180/M_PI;
 }
 
-/////////////////////////////  Setup  /////////////////////////////////
-void setup() {
-
-  Wire.begin(); // join i2c bus
-  Wire.setClock(400000); // 400kHz I2C clock. Comment this line if having compilation difficulties
-
-  Serial.begin(115200); // initialize serial communication
-  
-  servoSetup(); //servo setup
-
-  delay(2000); //wait for 3 seconds
-
-  runServoPrg(Zero, ZeroStep); // zero position
-  
-  delay(2000);
-  
-  sensorSetup(); //sensor setup
-
-  mpuSetup(); //mpu setup
-
-  PIDSetup(); //PID setup
-
-  PID2Setup(); //PID2 setup
-}
-
-/////////////////////////////  Loop  /////////////////////////////////
-
-void loop() {
-
-  mpuGetValues(); //get values from mpu
-  // if programming failed, don't try to do anything
-  if (!dmpReady) return;
+//State Machine
+void SpiderMini(){
 
   switch (currentState) {
 
     case Front:
-
+      MAX_DISTANCE = 135;
       Setpoint = 0;
-      myPID.Compute(); //compute PID
-      myPID2.Compute(); //compute PID2
-      
       ClimbUpdate(); //update climb
-      MoveUpdate(); //update move
+      MoveFrontUpdate(); //update move
       runServoPrgV(Forward, ForwardStep); //move forward
-
-      mpuGetValues(); //get values from mpu
       //Serial.print("Climb angle : ");
       //Serial.println(climbAngle);
       if((sensor() == 1 && climbAngle < 2)){
@@ -607,32 +607,60 @@ void loop() {
           currentState = Stair;
         }
         else {
-          if(side == 0){
-            runServoPrgV(Backward, BackwardStep); //move backward
-            while(directionAngle < 75){
-              runServoPrgV(Turnright, TurnrightStep); //turn right
-              mpuGetValues(); //get values from mpu
-            }
+          if(side == 0)
             currentState = Right;
-          }
-          if(side == 1){
-            runServoPrgV(Backward, BackwardStep); //move backward
-            while(directionAngle > -75){
-              runServoPrgV(Turnleft, TurnleftStep); //turn left
-              mpuGetValues(); //get values from mpu
-            }
-            currentState = Left;
-          }        
+          if(side == 1)
+            currentState = Left;       
         }
       }
-
     break;
 
     case Right:
+      MAX_DISTANCE = 190;
+      MoveRightUpdate();      
+      runServoPrgV(Moveright, MoverightStep); //move right
+      if(sensor() == 0){
+        side = 1;
+        currentState = Livre;
+      }
+    break;
+
+    case Left:
+      MAX_DISTANCE = 190;
+      MoveLeftUpdate();
+      runServoPrgV(Moveleft, MoveleftStep); //move left
+      if(sensor() == 0){
+        side = 0;
+        currentState = Livre;
+      }
+    break;
+
+    case Livre:
+      for(int i=0; i<3; i++){
+        mpuGetValues(); //get values from mpu
+        myPID.Compute(); //compute PID
+        if(side == 0){
+          MoveLeftUpdate();
+          runServoPrgV(Moveleft, MoveleftStep); //move left
+        }          
+        else if(side == 1){
+          MoveRightUpdate();
+          runServoPrgV(Moveright, MoverightStep); //move right
+        }
+      }
+      currentState = Front;
+    break;
+    
+    case Stair:
+      MoveFrontUpdate();
+      runServoPrgV(Forward, ForwardStep); //move forward
+      runServoPrgV(Climb, ClimbStep); //climb stair
+      currentState = Front;
+    break; 
+
+    /*case Right:
 
       Setpoint = 90;
-      myPID.Compute(); //compute PID
-      myPID2.Compute(); //compute PID2
       ClimbUpdate(); //update climb
 
       for(int i=0; i<7; i++){
@@ -659,8 +687,6 @@ void loop() {
     case Left:
 
       Setpoint = -90;
-      myPID.Compute(); //compute PID
-      myPID2.Compute(); //compute PID2
       ClimbUpdate(); //update climb
 
       for(int i=0; i<7; i++){
@@ -683,42 +709,87 @@ void loop() {
 
       currentState = Front;
 
+    break;*/
+  }
+}
+
+// Mode Select
+void ModeSelect(){
+   switch (currentMode){
+
+    case Mode1: //normal mode
+      SpiderMini();
+      if (digitalRead(BUTTON_PIN) == LOW) {
+        currentMode = Mode2;
+        Serial.println("Mode 2");
+        delay(1000);
+      }
     break;
 
-   // case Back:
-   //   if(ypr[0] * 180/M_PI > 0 && ypr[0] * 180/M_PI < 180){
-   //     Setpoint = 180;
-   //   }
-   //   else if(ypr[0] * 180/M_PI < 0 && ypr[0] * 180/M_PI > -180){
-   //     Setpoint = -180;
-   //   }
-   //   myPID.Compute(); //compute PID
-   //   myPID2.Compute(); //compute PID2
-   //   ClimbUpdate(); //update climb
-   //   MoveUpdate();
-   //   runServoPrgV(Forward, ForwardStep); //move forward
-   //   if(sensor() == 1){
-   //     runServoPrgV(Backward, BackwardStep); //move backward
-   //     for(int i=0; i<5; i++){
-   //       runServoPrgV(servoPrg07, servoPrg07step); //turn right
-   //     }
-   //     //side = 0;
-   //     currentState = Left;
-   //   }
-   //   break;
-     
-    case Stair:
+    case Mode2: //push up
+      runServoPrgV(Pushup, PushupStep); 
+      if (digitalRead(BUTTON_PIN) == LOW) {
+        currentMode = Mode3;
+        Serial.println("Mode 3");
+        delay(1000);
+      }
+    break;
 
-      mpuGetValues(); //get values from mpu
-      myPID.Compute(); //compute PID
+    case Mode3: //dance 1
+      runServoPrgV(Dance1, Dance1Step); 
+      if (digitalRead(BUTTON_PIN) == LOW) {
+        currentMode = Mode4;
+        Serial.println("Mode 4");
+        delay(1000);
+      }
+    break;
 
-      MoveUpdate();
-      runServoPrgV(Forward, ForwardStep); //move forward
-      runServoPrgV(Climb, ClimbStep); //climb stair
+    case Mode4: //dance 2
+      runServoPrgV(Dance2, Dance2Step);
+      if (digitalRead(BUTTON_PIN) == LOW) {
+        currentMode = Mode5;
+        Serial.println("Mode 5");
+        delay(1000);
+      }
+    break;
 
-      currentState = Front;
+    case Mode5: //dance 3
+      runServoPrgV(Dance3, Dance3Step);
+      if (digitalRead(BUTTON_PIN) == LOW) {
+        currentMode = Mode1;
+        Serial.println("Mode 1");
+        delay(1000);
+      }
+    break;
 
-    break;  
-  }  
+   }
 }
+
+/////////////////////////////  Setup  /////////////////////////////////
+void setup() {
+  pinMode(BUTTON_PIN, INPUT_PULLUP); //pin mode
+  Wire.begin(); // join i2c bus
+  Wire.setClock(400000); // 400kHz I2C clock. Comment this line if having compilation difficulties
+  Serial.begin(115200); // initialize serial communication
+  servoSetup(); //servo setup
+  delay(3000); //wait for servo setup
+  runServoPrgV(Standby, StandbyStep); //standby position  
+  sensorSetup(); //sensor setup
+  mpuSetup(); //mpu setup
+  PIDSetup(); //PID setup
+  PID2Setup(); //PID2 setup
+  runServoPrg(Zero, ZeroStep); // zero position
+}
+
+/////////////////////////////  Loop  /////////////////////////////////
+
+void loop() {
+  // if programming failed, don't try to do anything
+  if (!dmpReady) return;
+  mpuGetValues(); //get values from mpu
+  myPID.Compute(); //compute PID
+  myPID2.Compute(); //compute PID2
+  ModeSelect(); //mode select
+}
+
 /////////////////////////////  End  /////////////////////////////////
