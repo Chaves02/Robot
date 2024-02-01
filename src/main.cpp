@@ -18,7 +18,7 @@
 #include <elapsedMillis.h>
 #include <Wire.h>
 #include <VL53L0X.h>
-#include "I2Cdev.h"
+//#include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 #include <PID_v1.h>
 
@@ -59,7 +59,8 @@ typedef enum{ // State machine states
   Front,
   Right,
   Left,
-  Livre,
+  Clear,
+  Obstacle,
   Stair
 } state;
 state currentState = Front; // Initial state
@@ -602,17 +603,31 @@ void SpiderMini(){
       //Serial.print("Climb angle : ");
       //Serial.println(climbAngle);
       if((sensor() == 1 && climbAngle < 2)){
-        runServoPrgV(Checkup, CheckupStep); //checkup
-        if(sensor() == 0){
-          currentState = Stair;
-        }
-        else {
-          if(side == 0)
-            currentState = Right;
-          if(side == 1)
-            currentState = Left;       
-        }
+        currentState = Obstacle;
+        //runServoPrgV(Checkup, CheckupStep); //checkup
+        //if(sensor() == 0){
+        //  currentState = Stair;
+        //}
+        //else {
+        //  if(side == 0)
+        //    currentState = Right;
+        //  if(side == 1)
+        //    currentState = Left;       
+        //}
       }
+    break;
+    
+    case Obstacle:
+     runServoPrgV(Checkup, CheckupStep); //checkup
+      if(sensor() == 0){
+          currentState = Stair;
+      }
+      else if(sensor() == 1 && side == 0)
+            currentState = Right;
+      else if(sensor() == 1 && side == 1)
+            currentState = Left;       
+        
+      
     break;
 
     case Right:
@@ -621,7 +636,7 @@ void SpiderMini(){
       runServoPrgV(Moveright, MoverightStep); //move right
       if(sensor() == 0){
         side = 1;
-        currentState = Livre;
+        currentState = Clear;
       }
     break;
 
@@ -631,11 +646,11 @@ void SpiderMini(){
       runServoPrgV(Moveleft, MoveleftStep); //move left
       if(sensor() == 0){
         side = 0;
-        currentState = Livre;
+        currentState = Clear;
       }
     break;
 
-    case Livre:
+    case Clear:
       for(int i=0; i<3; i++){
         mpuGetValues(); //get values from mpu
         myPID.Compute(); //compute PID
