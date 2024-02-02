@@ -1,34 +1,31 @@
 // Spider_mini (Top View)
 //  -----               -----
 // |  L3 |             |  L1 |
-// | GP4 |             | GP0 |
+// | GP6 |             | GP0 |
 //  ----- -----   ----- -----
 //       |     | |     |
-//       | GP5 | | GP1 |
+//       | GP7 | | GP1 |
 //        -----   -----
 //       |     | |     |
-//       | GP6 | | GP2 |
+//       | GP8 | | GP2 |
 //  ----- -----   ----- -----
 // |  L4 |             |  L2 |
-// | GP7 |             | GP3 |
+// | GP9 |             | GP3 |
 //  -----               -----
 
 #include <Arduino.h>
 #include <Servo.h>
-#include <elapsedMillis.h>
 #include <Wire.h>
 #include <VL53L0X.h>
-//#include "I2Cdev.h"
-#include "MPU6050_6Axis_MotionApps20.h"
 #include <PID_v1.h>
+#include "MPU6050_6Axis_MotionApps20.h"
+#include "moves.h"
 
 #define BUTTON_PIN 17 // Button pin
 
 int MAX_DISTANCE = 135; // Maximum distance in milimeters
 VL53L0X VL53L0X_sensor; // VL53L0X object
 MPU6050 mpu(0x68); // MPU6050 object
-elapsedMillis timeElapsed; // Time elapsed since the last measurement
-const long interval = 300;  // Interval for checking the sensor (in milliseconds)
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
@@ -38,11 +35,7 @@ uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
 // MPU orientation/motion vars
 Quaternion q;           // [w, x, y, z]         quaternion container
-VectorInt16 aa;         // [x, y, z]            accel sensor measurements
-VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
-VectorInt16 aaWorld;    // [x, y, z]            world-frame accel sensor measurements
 VectorFloat gravity;    // [x, y, z]            gravity vector
-float euler[3];         // [psi, theta, phi]    Euler angle container
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 
 // PID direction controller
@@ -51,11 +44,13 @@ const double Kp=0.8, Ki=5, Kd=0;
 PID myPID(&directionAngle, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
 // PID climb controller
-double Setpoint2, climbAngle, Output2;
+double Setpoint2, climbAngle, Climb_Output;
 const double Kp2=1.4, Ki2=0.5, Kd2=0;
-PID myPID2(&climbAngle, &Output2, &Setpoint2, Kp2, Ki2, Kd2, DIRECT);
+PID myPID2(&climbAngle, &Climb_Output, &Setpoint2, Kp2, Ki2, Kd2, DIRECT);
 
-typedef enum{ // State machine states
+int side = 0; // last side
+
+typedef enum{ // Main state machine
   Front,
   Right,
   Left,
@@ -64,11 +59,8 @@ typedef enum{ // State machine states
   Stair
 } state;
 state currentState = Front; // Initial state
-int side = 0; // last side
-int aux_direction = 0; // auxiliar variable for direction
-int aux_climb = 0; // auxiliar variable for climb
 
-typedef enum{
+typedef enum{ // Mode select state machine
   Mode1,
   Mode2,
   Mode3,
@@ -78,283 +70,11 @@ typedef enum{
 operation_mode currentMode = Mode1; // Initial mode
 
 const int numberOfServos = 8; // Number of servos
-const int numberOfACE = 9; // Number of action code elements
 int servoCal[] = { -3, -4, 2, -7, -5, 0, 0, 7 }; // Servo calibration data
 int servoPos[] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // Servo current position
 int servoPrevPrg[] = { 0, 0, 0, 0, 0, 0, 0, 0 }; // Servo previous prg
 int servoPrgPeriod = 10; // 10 ms
 Servo servo[numberOfServos]; // Servo object
-
-///////////////////////////// Robot Actions /////////////////////////////
-
-// Zero
-int ZeroStep = 1;
-int Zero [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30,  90,  90, 150, 150,  90,  90,  30, 1000  }, // zero position
-};
-
-// Standby
-int StandbyStep = 2;
-int Standby [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   90,  90,  90,  90,  90,  90,  90,  90,  200  }, // prep standby
-  {  -30,   0,   0,  30,  30,   0,   0, -30,  200  }, // standby
-};
-
-// Check up
-int CheckupStep = 2;
-int Checkup [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   15,  90,  90, 165, 165,  90,  90,  15,  200  }, // standby
-  {    0,   0,   0, -70,   0,   0,   0,  70,  400  }, // leg2,4 up
-};
-
-// Forward
-int ForwardStep = 11;
-int Forward [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby
-  {   30,   0,   0,   0,   0,   0, -55,  30,  100  }, // leg1,4 up; leg4 fw
-  {  -30,   0,   0,   0,   0,   0,   0, -30,  100  }, // leg1,4 dn
-  {    0,   0,   0, -30, -30,   0,   0,   0,  100  }, // leg2,3 up
-  {    0, -55,  55,   0,   0,   0,  55,   0,  100  }, // leg1,4 bk; leg2 fw
-  {    0,   0,   0,  30,  30,   0,   0,   0,  100  }, // leg2,3 dn
-  {   30,  55,   0,   0,   0,   0,   0,  30,  100  }, // leg1,4 up; leg1 fw
-  {    0,   0, -55,   0,   0,  55,   0,   0,  100  }, // leg2,3 bk
-  {  -30,   0,   0,   0,   0,   0,   0, -30,  100  }, // leg1,4 dn
-  {    0,   0,   0,   0, -30,   0,   0,   0,  100  }, // leg3 up
-  {    0,   0,   0,   0,  30, -55,   0,   0,  100  }, // leg3 fw dn
-};
-
-// Backward
-int BackwardStep = 11;
-int Backward [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby
-  {   20, -45,   0,   0,   0,   0,   0,  20,  100  }, // leg4,1 up; leg1 fw
-  {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg4,1 dn
-  {    0,   0,   0, -20, -20,   0,   0,   0,  100  }, // leg3,2 up
-  {    0,  45,   0,   0,   0,  65, -65,   0,  100  }, // leg4,1 bk; leg3 fw
-  {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg3,2 dn
-  {   20,   0,   0,   0,   0,   0,  65,  20,  100  }, // leg4,1 up; leg4 fw
-  {    0,   0,  45,   0,   0, -65,   0,   0,  100  }, // leg3,1 bk
-  {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg4,1 dn
-  {    0,   0,   0, -20,   0,   0,   0,   0,  100  }, // leg2 up
-  {    0,   0, -45,  20,   0,   0,   0,   0,  100  }, // leg2 fw dn
-};
-
-// Climb
-int ClimbStep = 33;
-int Climb [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   15,  90,  90, 165, 165,  90,  90,  15,  200  }, // standby
-  {   50,   0,   0,   0,   0,   0, -50,  20,  200  }, // leg1,4 up; leg4 fw
-  {  -50,   0,   0,   0,   0,   0,   0, -20,  200  }, // leg1,4 dn
-  {    0,   0,   0, -20, -70,   0,   0,   0,  200  }, // leg2,3 up (gp4- 50)
-  {    0, -50,  50,   0,   0,   0,  50,   0,  200  }, // leg1,4 bk; leg2 fw
-  {    0,   0,   0,  20,  70,   0,   0,   0,  200  }, // leg2,3 dn
-  {   50,  50,   0,   0,   0,   0,   0,  20,  200  }, // leg1,4 up; leg1 fw
-  {    0,   0, -50,   0,   0,  50,   0,   0,  200  }, // leg2,3 bk
-  {  -50,   0,   0,   0,   0,   0,   0, -20,  200  }, // leg1,4 dn
-  {    0,   0,   0,   0, -20,   0,   0,   0,  200  }, // leg3 up
-  {    0,   0,   0,   0,  20, -50,   0,   0,  200  }, // leg3 fw dn
-  {   20,   0,   0,   0, -20,   0,   0,   0,  200  }, // leg1,3 up   //baixa frente
-  {   40,   0,   0,   0,   0,   0, -50,  20,  200  }, // leg1,4 up; leg4 fw
-  {  -40,   0,   0,   0,   0,   0,   0, -20,  200  }, // leg1,4 dn
-  {    0,   0,   0, -20, -40,   0,   0,   0,  200  }, // leg2,3 up
-  {    0, -50,  50,   0,   0,   0,  70,   0,  200  }, // leg1,4 bk; leg2 fw
-  {    0,   0,   0,  20,  40,   0,   0,   0,  200  }, // leg2,3 dn
-  {   20,  50,   0,   0,   0,   0,   0,  20,  200  }, // leg1,4 up; leg1 fw 
-  {    0,   0, -70,   0,   0,  50,   0,   0,  200  }, // leg2,3 bk
-  {  -20,   0,   0,   0,   0,   0,   0, -20,  200  }, // leg1,4 dn
-  {    0,   0,   0,   0,   0,   0,   0,  70,  200  }, // leg4 up     //começa patas de trás
-  {    0,   0,   0,   0,   0,   0, -80,   0,  200  }, // leg4 fw
-  {    0,   0,   0,   0,   0,   0,   0, -70,  200  }, // leg4 dn
-  {    0,   0,   0,   0,   0, -70,   0,   0,  200  }, // leg3 fw 
-  {    0,   0,   0,   0,   0,  70,  80,   0,  200  }, // leg3,4 bk
-  {   10,   0,   0,   0, -10,   0,   0,   0,  200  }, // leg1,3 up   //baixa frente
-  {    0,   0,   0, -70,   0,   0,   0,   0,  200  }, // leg2 up
-  {    0,   0,  80,   0,   0,   0,   0,   0,  200  }, // leg2 fw
-  {    0,   0,   0,  70,   0,   0,   0,   0,  200  }, // leg2 dn
-  {    0, -70, -80,   0,   0,   0,   0,   0,  200  }, // leg1,2 bk
-  {   60,   0,   0,   0, -60,   0,   0,   0,  200  }, // leg1,3 up   //baixa tudo frente
-  {    0,  70,   0,   0,   0, -70,   0,   0,  200  },  //leg1,3 fw  //reset
-  {  -90,   0,   0,   0,  90,   0,   0,   0,  200  }, // leg1,3 dn  //sobe frente
-};
-
-// Move Left
-int MoveleftStep = 11;
-int Moveleft [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby
-  {    0,   0, -45, -20, -20,   0,   0,   0,  100  }, // leg3,2 up; leg2 fw
-  {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg3,2 dn
-  {   20,   0,   0,   0,   0,   0,   0,  20,  100  }, // leg1,4 up
-  {    0,  45,  45,   0,   0, -45,   0,   0,  100  }, // leg3,2 bk; leg1 fw
-  {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg1,4 dn
-  {    0,   0,   0, -20, -20,  45,   0,   0,  100  }, // leg3,2 up; leg3 fw
-  {    0, -45,   0,   0,   0,   0,  45,   0,  100  }, // leg1,4 bk
-  {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg3,2 dn
-  {    0,   0,   0,   0,   0,   0,   0,  20,  100  }, // leg4 up
-  {    0,   0,   0,   0,   0,   0, -45, -20,  100  }, // leg4 fw dn
-};
-
-// Move Right
-int MoverightStep = 11;
-int Moveright [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby
-  {    0,   0,   0, -20, -20, -45,   0,   0,  100  }, // leg2,3 up; leg3 fw
-  {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg2,3 dn
-  {   20,   0,   0,   0,   0,   0,   0,  20,  100  }, // leg4,1 up
-  {    0,   0, -45,   0,   0,  45,  45,   0,  100  }, // leg2,3 bk; leg4 fw
-  {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg4,1 dn
-  {    0,   0,  45, -20, -20,   0,   0,   0,  100  }, // leg2,3 up; leg2 fw
-  {    0,  45,   0,   0,   0,   0, -45,   0,  100  }, // leg4,1 bk
-  {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg2,3 dn
-  {   20,   0,   0,   0,   0,   0,   0,   0,  100  }, // leg1 up
-  {  -20, -45,   0,   0,   0,   0,   0,   0,  100  }, // leg1 fw dn
-};
-
-// Turn left
-int TurnleftStep = 8;
-int Turnleft [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby
-  {   20,   0,   0,   0,   0,   0,   0,  20,  100  }, // leg1,4 up
-  {    0,  45,   0,   0,   0,   0,  45,   0,  100  }, // leg1,4 turn
-  {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg1,4 dn
-  {    0,   0,   0, -20, -20,   0,   0,   0,  100  }, // leg2,3 up
-  {    0,   0,  45,   0,   0,  45,   0,   0,  100  }, // leg2,3 turn
-  {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg2,3 dn
-  {    0, -45, -45,   0,   0, -45, -45,   0,  100  }, // leg1,2,3,4 turn
-};
-
-// Turn right
-int TurnrightStep = 8;
-int Turnright [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30,  90,  90, 150, 150,  90,  90,  30,  100  }, // standby
-  {    0,   0,   0, -20, -20,   0,   0,   0,  100  }, // leg2,3 up
-  {    0,   0, -45,   0,   0, -45,   0,   0,  100  }, // leg2,3 turn
-  {    0,   0,   0,  20,  20,   0,   0,   0,  100  }, // leg2,3 dn
-  {   20,   0,   0,   0,   0,   0,   0,  20,  100  }, // leg1,4 up
-  {    0, -45,   0,   0,   0,   0, -45,   0,  100  }, // leg1,4 turn
-  {  -20,   0,   0,   0,   0,   0,   0, -20,  100  }, // leg1,4 dn
-  {    0,  45,  45,   0,   0,  45,  45,   0,  100  }, // leg1,2,3,4 turn
-};
-
-// Lie
-int LieStep = 6;
-int Lie [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30,  90,  90, 150, 150,  80,  90,  30, 100 }, //standby
-  {  150,   0,   0, -20,   0,   0,   0,  20, 200 }, //leg1 maxup and leg2,4 up
-  {    0,  45,   0,   0,   0,   0,   0,   0, 350 }, //leg1 fw
-  {    0, -45,   0,   0,   0,   0,   0,   0, 350 }, //leg1 bk
-  {    0,  45,   0,   0,   0,   0,   0,   0, 350 }, //leg1 fw
-  {    0, -45,   0,   0,   0,   0,   0,   0, 350 }  //leg1 bk
-};
-
-// Say Hi
-int SayhiStep = 4;
-int Sayhi [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {    0,  90,  90, 150, 180,  90,  90,  30,  200  }, // leg1, 3 down
-  {   30,   0,   0,   0, -30,   0,   0,   0,  200  }, // standby
-  {  -30,   0,   0,   0,  30,   0,   0,   0,  200  }, // leg1, 3 down
-  {   30,   0,   0,   0, -30,   0,   0,   0,  200  }, // standby
-};
-
-// Fighting
-int FightingStep = 11;
-int Fighting [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {    0,  90,  90, 180, 150,  90,  90,  30,  200  }, // leg1, 2 down
-  {    0, -20, -20,   0,   0, -20, -20,   0,  200  }, // body turn left
-  {    0,  40,  40,   0,   0,  40,  40,   0,  200  }, // body turn right
-  {    0, -40, -40,   0,   0, -40, -40,   0,  200  }, // body turn left
-  {    0,  40,  40,   0,   0,  40,  40,   0,  200  }, // body turn right
-  {   30, -20, -20, -20,  30, -20, -20, -20,  200  }, // leg1, 2 up ; leg3, 4 down
-  {    0, -20, -20,   0,   0, -20, -20,   0,  200  }, // body turn left
-  {    0,  40,  40,   0,   0,  40,  40,   0,  200  }, // body turn right
-  {    0, -40, -40,   0,   0, -40, -40,   0,  200  }, // body turn left
-  {    0,  40,  40,   0,   0,  40,  40,   0,  200  }, // body turn right
-  {    0, -20, -20,   0,   0, -20, -20,   0,  200  }, // leg1, 2 up ; leg3, 4 down
-};
-
-// Push up
-int PushupStep = 11;
-int Pushup [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30,  45,  38, 150, 150, 135, 147,  30,  300  }, // start position           
-  {   30,   0,   0, -40, -30,   0,   0,   0,  400  }, // down
-  {  -30,   0,   0,  40,  30,   0,   0,   0,  500  }, // up
-  {   30,   0,   0,   0, -30,   0,   0,  40,  600  }, // down
-  {  -30,   0,   0,   0,  30,   0,   0, -40,  700  }, // up
-  {   30,   0,   0, -40, -30,   0,   0,   0,  1300 }, // down
-  {  -30,   0,   0,  40,  30,   0,   0,   0,  1800 }, // up
-  {   45,   0,   0, -30, -45,   0,   0,  30,  200  }, // fast down
-  {  -45,   0,   0,   0,  10,   0,   0,   0,  500  }, // leg1 up
-  {    0,   0,   0,   0,  35,   0,   0,   0,  500  }, // leg2 up
-  {    0,   0,   0,  30,   0,   0,   0, -30,  500  }, // leg3, leg4 up
-};
-
-// Sleep
-int SleepStep = 2;
-int Sleep [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {    0,  90,  90, 150, 150,  90,  90,   0,  400  }, // leg1,4 dn
-  {    0, -45,  45,   0,   0,  45, -45,   0,  400  }, // protect myself
-};
-
-// Dancing 1
-int Dance1Step = 10;
-int Dance1 [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30,  90,  90, 150, 150,  90,  90,  30,  300  }, // leg1,2,3,4 up
-  {  -30,   0,   0,   0,   0,   0,   0,   0,  300  }, // leg1 dn
-  {   30,   0,   0,  30,   0,   0,   0,   0,  300  }, // leg1 up; leg2 dn
-  {    0,   0,   0, -30,   0,   0,   0, -30,  300  }, // leg2 up; leg4 dn
-  {    0,   0,   0,   0,  30,   0,   0,  30,  300  }, // leg4 up; leg3 dn
-  {  -30,   0,   0,   0, -30,   0,   0,   0,  300  }, // leg3 up; leg1 dn
-  {   30,   0,   0,  30,   0,   0,   0,   0,  300  }, // leg1 up; leg2 dn
-  {    0,   0,   0, -30,   0,   0,   0, -30,  300  }, // leg2 up; leg4 dn
-  {    0,   0,   0,   0,  30,   0,   0,  30,  300  }, // leg4 up; leg3 dn
-  {    0,   0,   0,   0, -30,   0,   0,   0,  300  }, // leg3 up
-};
-
-// Dancing 2
-int Dance2Step = 9;
-int Dance2 [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30,  45, 135, 150, 150, 135,  45,  30,  300  }, // leg1,2,3,4 two sides
-  {   30,   0,   0, -30,   0,   0,   0,   0,  300  }, // leg1,2 up
-  {  -30,   0,   0,  30, -30,   0,   0,  30,  300  }, // leg1,2 dn; leg3,4 up
-  {   30,   0,   0, -30,  30,   0,   0, -30,  300  }, // leg3,4 dn; leg1,2 up
-  {  -30,   0,   0,  30, -30,   0,   0,  30,  300  }, // leg1,2 dn; leg3,4 up
-  {   30,   0,   0, -30,  30,   0,   0, -30,  300  }, // leg3,4 dn; leg1,2 up
-  {  -30,   0,   0,  30, -30,   0,   0,  30,  300  }, // leg1,2 dn; leg3,4 up
-  {   30,   0,   0, -30,  30,   0,   0, -30,  300  }, // leg3,4 dn; leg1,2 up
-  {  -25,   0,   0,  25,   0,   0,   0,   0,  300  }, // leg1,2 dn
-};
-
-// Dancing 3
-int Dance3Step = 10;
-int Dance3 [][numberOfACE]  = {
-  // GP0, GP1, GP2, GP3, GP4, GP5, GP6, GP7,  ms
-  {   30,  45,  38, 150, 150, 135, 147,  30,  300  }, // leg1,2,3,4 bk
-  {   30,   0,   0, -40, -30,   0,   0,   0,  300  }, // leg1,2,3 up
-  {  -30,   0,   0,  40,  30,   0,   0,   0,  300  }, // leg1,2,3 dn
-  {   30,   0,   0,   0, -30,   0,   0,  40,  300  }, // leg1,3,4 up
-  {  -30,   0,   0,   0,  30,   0,   0, -40,  300  }, // leg1,3,4 dn
-  {   30,   0,   0, -40, -30,   0,   0,   0,  300  }, // leg1,2,3 up
-  {  -30,   0,   0,  40,  30,   0,   0,   0,  300  }, // leg1,2,3 dn
-  {   30,   0,   0,   0, -30,   0,   0,  40,  300  }, // leg1,3,4 up
-  {  -30,   0,   0,   0,  30,   0,   0, -40,  300  }, // leg1,3,4 dn
-  {    0,  45,  45,   0,   0, -45, -45,   0,  300  }, // standby
-};
 
 /////////////////////////////  Functions  /////////////////////////////////
 
@@ -410,12 +130,8 @@ void runServoPrgV(int servoPrg[][numberOfACE], int step) {
 // check sensor
 int sensor() {
   int flag = 0; // Flag to indicate if an object is detected
-  if (timeElapsed >= interval) {
-    timeElapsed = 0; 
-
     // Perform the sensor reading
     uint16_t distance = VL53L0X_sensor.readRangeSingleMillimeters();
-
     // Check if an object is detected within the specified range
     if (distance > 0 && distance < MAX_DISTANCE) {
       // Object detected, set the flag to 1
@@ -424,13 +140,12 @@ int sensor() {
       // No object detected, set the flag to 0
       flag = 0;
     }
-
     // Print the distance and flag status
     Serial.print("Distance: ");
     Serial.print(distance);
     Serial.print(" mm, Flag: ");
-    Serial.println(flag); 
-  }
+    Serial.println(flag);
+
   return flag;
 }
 
@@ -533,50 +248,46 @@ void PID2Setup(){
 
 // Front Update
 void MoveFrontUpdate(){
-  aux_direction = Output;
-  Forward[4][1] = -45 + aux_direction;
-  Forward[6][1] =  45 - aux_direction;
-  Forward[4][2] =  45 - aux_direction;
-  Forward[7][2] = -45 + aux_direction;
-  Forward[7][5] =  45 + aux_direction;
-  Forward[10][5]= -45 - aux_direction;
-  Forward[1][6] = -45 - aux_direction;
-  Forward[4][6] =  45 + aux_direction;
+  Forward[4][1] = -45 + Output;
+  Forward[6][1] =  45 - Output;
+  Forward[4][2] =  45 - Output;
+  Forward[7][2] = -45 + Output;
+  Forward[7][5] =  45 + Output;
+  Forward[10][5]= -45 - Output;
+  Forward[1][6] = -45 - Output;
+  Forward[4][6] =  45 + Output;
 }
 
-//Left Update
+// Left Update
 void MoveLeftUpdate(){
-  aux_direction = Output;
-  Moveleft[4][1] = 45 - aux_direction;
-  Moveleft[7][1] =  -45 + aux_direction;
-  Moveleft[1][2] =  -45 - aux_direction;
-  Moveleft[4][2] = 45 + aux_direction;
-  Moveleft[4][5] =  -45 + aux_direction;
-  Moveleft[6][5]= 45 - aux_direction;
-  Moveleft[7][6] = 45 + aux_direction;
-  Moveleft[10][6] =  -45 - aux_direction;
+  Moveleft[4][1] =   45 - Output;
+  Moveleft[7][1] =  -45 + Output;
+  Moveleft[1][2] =  -45 - Output;
+  Moveleft[4][2] =   45 + Output;
+  Moveleft[4][5] =  -45 + Output;
+  Moveleft[6][5]=    45 - Output;
+  Moveleft[7][6] =   45 + Output;
+  Moveleft[10][6] = -45 - Output;
 }
 
-//Right Update
+// Right Update
 void MoveRightUpdate(){
-  aux_direction = Output;
-  Moveright[7][1] = 45 + aux_direction;
-  Moveright[10][1] =  -45 - aux_direction;
-  Moveright[4][2] =  -45 + aux_direction;
-  Moveright[6][2] = 45 - aux_direction;
-  Moveright[1][5] =  -45 - aux_direction;
-  Moveright[4][5]= 45 + aux_direction;
-  Moveright[4][6] = 45 - aux_direction;
-  Moveright[7][6] =  -45 + aux_direction;
+  Moveright[7][1] =   50 + Output;
+  Moveright[10][1] = -50 - Output;
+  Moveright[4][2] =  -45 + Output;
+  Moveright[6][2] =   45 - Output;
+  Moveright[1][5] =  -50 - Output;
+  Moveright[4][5]=    50 + Output;
+  Moveright[4][6] =   45 - Output;
+  Moveright[7][6] =  -45 + Output;
 }
 
 // Climb Update
 void ClimbUpdate(){
-  aux_climb = Output2;
-  Forward[0][0] = 30 + aux_climb;
-  Forward[0][3] = 150 + aux_climb;
-  Forward[0][4] = 150 - aux_climb;
-  Forward[0][7] = 30 - aux_climb;
+  Forward[0][0] =  30 + Climb_Output;
+  Forward[0][3] = 150 + Climb_Output;
+  Forward[0][4] = 150 - Climb_Output;
+  Forward[0][7] =  30 - Climb_Output;
 }
 
 // read mpu values
@@ -589,7 +300,7 @@ void mpuGetValues(){
   climbAngle = ypr[2] * 180/M_PI;
 }
 
-//State Machine
+//Main State Machine
 void SpiderMini(){
 
   switch (currentState) {
@@ -602,32 +313,21 @@ void SpiderMini(){
       runServoPrgV(Forward, ForwardStep); //move forward
       //Serial.print("Climb angle : ");
       //Serial.println(climbAngle);
-      if((sensor() == 1 && climbAngle < 2)){
+      if((sensor() == 1 && climbAngle < 2))
         currentState = Obstacle;
-        //runServoPrgV(Checkup, CheckupStep); //checkup
-        //if(sensor() == 0){
-        //  currentState = Stair;
-        //}
-        //else {
-        //  if(side == 0)
-        //    currentState = Right;
-        //  if(side == 1)
-        //    currentState = Left;       
-        //}
-      }
     break;
     
     case Obstacle:
-     runServoPrgV(Checkup, CheckupStep); //checkup
+      runServoPrgV(Checkup, CheckupStep); //checkup
       if(sensor() == 0){
           currentState = Stair;
       }
-      else if(sensor() == 1 && side == 0)
-            currentState = Right;
-      else if(sensor() == 1 && side == 1)
-            currentState = Left;       
-        
-      
+      else{
+        if(side == 0)
+          currentState = Right;
+        if(side == 1)
+          currentState = Left; 
+      }     
     break;
 
     case Right:
@@ -671,64 +371,12 @@ void SpiderMini(){
       runServoPrgV(Forward, ForwardStep); //move forward
       runServoPrgV(Climb, ClimbStep); //climb stair
       currentState = Front;
-    break; 
-
-    /*case Right:
-
-      Setpoint = 90;
-      ClimbUpdate(); //update climb
-
-      for(int i=0; i<7; i++){
-        if(sensor() == 0){
-        mpuGetValues(); //get values from mpu
-        myPID.Compute(); //compute PID
-        MoveUpdate(); //update move
-        runServoPrgV(Forward, ForwardStep); //move forward
-        }
-        else{
-          break;
-        }
-      }
-
-      while(directionAngle > 15 || directionAngle < -15){
-        runServoPrgV(Turnleft, TurnleftStep); //turn left
-        mpuGetValues(); //get values from mpu
-        side = 1;
-      }     
-      currentState = Front;
-
     break;
 
-    case Left:
-
-      Setpoint = -90;
-      ClimbUpdate(); //update climb
-
-      for(int i=0; i<7; i++){
-        if(sensor() == 0){
-        mpuGetValues(); //get values from mpu
-        myPID.Compute(); //compute PID
-        MoveUpdate();
-        runServoPrgV(Forward, ForwardStep); //move forward
-        }
-        else{
-          break;
-        }
-      }
-
-      while(directionAngle > 15 || directionAngle < -15){
-        runServoPrgV(Turnright, TurnrightStep); //turn right
-        mpuGetValues(); //get values from mpu
-        side = 0;
-      }
-
-      currentState = Front;
-
-    break;*/
   }
 }
 
-// Mode Select
+// Mode Select State Machine
 void ModeSelect(){
    switch (currentMode){
 
@@ -742,7 +390,8 @@ void ModeSelect(){
     break;
 
     case Mode2: //push up
-      runServoPrgV(Pushup, PushupStep); 
+      runServoPrgV(Pushup, PushupStep);
+      runServoPrgV(Lie, LieStep); 
       if (digitalRead(BUTTON_PIN) == LOW) {
         currentMode = Mode3;
         Serial.println("Mode 3");
@@ -781,6 +430,7 @@ void ModeSelect(){
 }
 
 /////////////////////////////  Setup  /////////////////////////////////
+
 void setup() {
   pinMode(BUTTON_PIN, INPUT_PULLUP); //pin mode
   Wire.begin(); // join i2c bus
@@ -793,6 +443,7 @@ void setup() {
   mpuSetup(); //mpu setup
   PIDSetup(); //PID setup
   PID2Setup(); //PID2 setup
+  runServoPrgV(Sayhi, SayhiStep); //say hi
   runServoPrg(Zero, ZeroStep); // zero position
 }
 
