@@ -29,9 +29,7 @@ MPU6050 mpu(0x68); // MPU6050 object
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
-uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
-uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
-uint16_t fifoCount;     // count of all bytes currently in FIFO
+uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)+
 uint8_t fifoBuffer[64]; // FIFO storage buffer
 // MPU orientation/motion vars
 Quaternion q;           // [w, x, y, z]         quaternion container
@@ -191,8 +189,6 @@ void mpuSetup() {
     Serial.println(F("Enabling DMP..."));
     mpu.setDMPEnabled(true);
     dmpReady = true;
-
-    packetSize = mpu.dmpGetFIFOPacketSize();
   } else {
     // ERROR!
     // 1 = initial memory load failed
@@ -231,8 +227,6 @@ void PIDSetup(){
   //turn the PID on
   myPID.SetMode(AUTOMATIC);
   myPID.SetOutputLimits(-30, 30); //set the output limits
-  myPID.SetSampleTime(10); //refresh rate
-  myPID.SetTunings(Kp, Ki, Kd); //set PID gains
   Setpoint = 0; //setpoint
 }
 
@@ -241,8 +235,6 @@ void PID2Setup(){
   //turn the PID on
   myPID2.SetMode(AUTOMATIC);
   myPID2.SetOutputLimits(-20, 20); //set the output limits
-  myPID2.SetSampleTime(10); //refresh rate
-  myPID2.SetTunings(Kp2, Ki2, Kd2); //set PID gains
   Setpoint2 = 0; //setpoint
 }
 
@@ -434,7 +426,6 @@ void ModeSelect(){
 void setup() {
   pinMode(BUTTON_PIN, INPUT_PULLUP); //pin mode
   Wire.begin(); // join i2c bus
-  Wire.setClock(400000); // 400kHz I2C clock. Comment this line if having compilation difficulties
   Serial.begin(115200); // initialize serial communication
   servoSetup(); //servo setup
   delay(3000); //wait for servo setup
